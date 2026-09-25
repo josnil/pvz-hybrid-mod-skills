@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "id": "nailongzombie",
+  "name": "奶龙僵尸",
+  "version": "1.0.0",
+  "author": "云漫行",
+  "description": "普通僵尸的移动 / 啃食 / 受击 / 死亡，外加大笑控场：出场后每 10 秒大笑一次，切到大笑形象并播奶龙笑声，一边笑一边照常往前走；同时全场植物被笑得僵直 3 秒、完全无法发射子弹。（含托管运行时插件 Runtime/ModAssembly.dll）",
+  "dependencies": [],
+  "conflicts": [],
+  "provides": {
+    "Audio": [
+      "nailong_laugh"
+    ],
+    "Character": [
+      "ZombieNaiLong"
+    ],
+    "CharacterSprite": [
+      "ZombieNaiLong"
+    ],
+    "Packet": [
+      "ZombieNaiLong"
+    ]
+  },
+  "overrides": {},
+  "scripts": [],
+  "runtimeAssembly": "Runtime/ModAssembly.dll",
+  "runtimeEntryType": "NaiLongRuntimeEntry",
+  "runtimeApiVersion": 1,
+  "runtimeAssemblyPolicy": "optional",
+  "blueprints": [],
+  "translations": [],
+  "resources": [
+    "Assets/Audio/Sfx/nailong_laugh.wav",
+    "Resources/Animations/NaiLong.dat",
+    "Resources/Animations/NaiLong.tres",
+    "Resources/Animations/NaiLongAtlas.png",
+    "Resources/Cards/ZombieNaiLong.tres",
+    "Resources/Characters/Zombies/ZombieNaiLong/Config/TowerDefenseZombieNaiLong.tres",
+    "Resources/Characters/Zombies/ZombieNaiLong/Packet/ZombieNaiLong.tres",
+    "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLong.tscn",
+    "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLongAttackComponentDefinition.tres",
+    "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLongComponentSet.tres",
+    "Resources/Characters/Zombies/ZombieNaiLong/Sprite/ZombieNaiLong.tscn",
+    "Runtime/ModAssembly.dll"
+  ]
+}

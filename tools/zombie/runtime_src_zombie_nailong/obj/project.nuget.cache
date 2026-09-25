@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "0i2VkOYjdoA=",
+  "success": true,
+  "projectFilePath": "D:\\zzz\\pvzHE\\pvz-hybrid-mod-skills\\tools\\zombie\\runtime_src_zombie_nailong\\NaiLongRuntime.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\yanxulin002\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.19\\microsoft.netcore.app.ref.9.0.19.nupkg.sha512",
+    "C:\\Users\\yanxulin002\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.19\\microsoft.windowsdesktop.app.ref.9.0.19.nupkg.sha512",
+    "C:\\Users\\yanxulin002\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.19\\microsoft.aspnetcore.app.ref.9.0.19.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TowerDefensePacketConfig" format=3]
+
+[ext_resource type="Resource" path="../../Config/TowerDefenseZombieNaiLong.tres" id="1"]
+[ext_resource type="Script" path="res://Registry/Battle/Feature/PacketBank/Resource/Packet/TowerDefensePacketConfig.cs" id="2"]
+
+[resource]
+script = ExtResource("2")
+saveKey = "ZombieNaiLong"
+unlockCheckList = []
+name = "奶龙僵尸"
+describe = "普通僵尸的移动 / 啃食 / 受击 / 死亡，外加大笑控场：出场后每 10 秒大笑一次，切到大笑形象并播奶龙笑声，一边笑一边照常往前走；同时全场植物被笑得僵直 3 秒、完全无法发射子弹。"
+handbookDescribe = "奶龙僵尸：本体 1350 血，一口 100 的啃食伤害，跑起来比普通僵尸快一倍——但它真正的本事是笑。\n出场之后每 10 秒大笑一次，一笑就换上那副咧嘴大笑的样子、放出奶龙标志性的笑声，\n脚下可一步没停：这 3 秒里它是边笑边正常往前走的。\n被它笑到的植物会僵在原地 3 秒：既动不了，也发不出子弹。\n要是它正好走到坚果墙前面笑起来，这 3 秒就是你补种的机会——或者你丢掉一排的机会。\n血量：[color=cc241d]1350[/color]\n伤害：[color=cc241d]100/s（啃食）[/color]\n佩戴：[color=cc241d]---[/color]\n类型：[color=cc241d]小型僵尸[/color]\n移速：[color=cc241d]快[/color]"
+handbookStory = "「哈哈哈哈哈哈——」\n（植物们：……到底有什么好笑的？）"
+packetAnimeClip = "Idle1&Idle2"
+packetAnimeOffset = Vector2(25, 60)
+packetAnimeScale = Vector2(0.75, 0.75)
+characterConfig = ExtResource("1")
+type = 6
+override = null
+metadata/_custom_type_script = "res://Registry/Battle/Feature/PacketBank/Resource/Packet/TowerDefensePacketConfig.cs"

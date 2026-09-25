@@ -1,0 +1,16 @@
+{
+  "Assets/Audio/Sfx/nailong_laugh.wav": "82577474b766ae5cab1138edf197d730296b6a67767f5911adb918dca1695324",
+  "Resources/Animations/NaiLong.dat": "f6e31c4b57f917532f4c93138205864a8eafc42990a59d697695678b12cfb3bb",
+  "Resources/Animations/NaiLong.tres": "ea230c41d65cf6296aaee34a774490ae5c5de8d09d548b168a5a51ed336d9f3b",
+  "Resources/Animations/NaiLongAtlas.png": "d6e1b2fc00a0466f4f0e9a05c7f0119040d7cf96c02f44bab1fa533ee9ac79a4",
+  "Resources/Cards/ZombieNaiLong.tres": "c93f738b0f2ae0133b8d24541af6db9b6a4b0265eb19f35ba00c734076d3fea8",
+  "Resources/Characters/Zombies/ZombieNaiLong/Config/TowerDefenseZombieNaiLong.tres": "dbd95d797e3d3a338153da82ceaa8bfc03ffbfb695238934f7ded3e221d54821",
+  "Resources/Characters/Zombies/ZombieNaiLong/Packet/ZombieNaiLong.tres": "bd4bb402486ca0ac2f4b3c9242a22d1c0b370b90ad44d45350cc8d3f6757ec38",
+  "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLong.tscn": "71b8c5ddfe756196ebc3a8b3d39aa22c34e1ce45d0691eab9a4a93e3e84495c4",
+  "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLongAttackComponentDefinition.tres": "df3128b53a59ace7bb807a1edd54c77535c25b4bce4a15f9ea3ce4dc0b6350a1",
+  "Resources/Characters/Zombies/ZombieNaiLong/Scene/ZombieNaiLongComponentSet.tres": "da87c105a21c2432a9db84b0b03f7c670ef35ab41fb3df0d14a04b00a4bead7b",
+  "Resources/Characters/Zombies/ZombieNaiLong/Sprite/ZombieNaiLong.tscn": "5935de8b8d6750a721f7d8bedffba29cc593019e318bff17166a5bb79f3bef10",
+  "Runtime/ModAssembly.dll": "bfd6c25e43670f94fb2622cefa5c7526a66a4f078162b89f20c9eb9c09addd59",
+  "mod.json": "1d4630f508edab3af868e15228a818bc6cd08ad08ec6e059d7ced965f2d10f8e",
+  "奶龙僵尸.pvzmodeproject": "c8ae1d2ca4062affefa960c530c4fc409049391545fb1fde6512de12eb0f9dc7"
+}

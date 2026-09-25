@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Extends/AdobeAnimateSprite/AdobeAnimateSpriteBase.cs" id="1_sprite"]
+[ext_resource type="Resource" path="../../../../../Resources/Animations/NaiLong.tres" id="2_data"]
+
+[node name="ZombieNaiLongSprite" type="Node2D"]
+script = ExtResource("1_sprite")
+flashAnimeData = ExtResource("2_data")
+useMultiMesh = true
+offset = Vector2(0, 0)
+trueFrameRate = 180.0
+useTween = false
+Animation/Clip = "Idle1"
+metadata/mod_resource_kind = "CharacterSprite"
+metadata/mod_preview_source = "自制皮肤：站立图 + 大笑图 两张素材，10 个剪辑 / 132 帧（离线程序化生成）"
+
+[node name="HeadSlot" type="Node2D" parent="."]
+position = Vector2(-14.00, -44.00)
+
+[node name="ArmSlot" type="Node2D" parent="."]
+position = Vector2(16.00, -25.00)
+
+[node name="ConeSlot" type="Node2D" parent="."]
+position = Vector2(-18.00, -70.00)
+
+[node name="BucketSlot" type="Node2D" parent="."]
+position = Vector2(-18.00, -64.00)
+
+[node name="ScreendoorSlot" type="Node2D" parent="."]
+position = Vector2(-30.00, -10.00)
+
+[node name="GroundSlot" type="Node2D" parent="."]
+position = Vector2(-31.00, -40.00)

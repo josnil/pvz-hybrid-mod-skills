@@ -10,12 +10,15 @@
 
 A **WorkBuddy Agent Skills** collection for modding *Plants vs. Zombies Hybrid Edition* (Godot 4 + C#). It consists of three interlocking skills: a universal `.pmod` package-format encyclopedia, plus two end-to-end pipelines — one for plants, one for zombies. Everything here comes from repeated, real-project testing: every "iron rule" corresponds to an actual pitfall, and every pitfall includes its root cause with engine-source-level evidence.
 
+> 🚀 **First time here? Start with [GETTING_STARTED.md](GETTING_STARTED.md)** — build your first in-game stat mod in about 30 minutes, no unpacking and no code required.
+
 > 🇨🇳 Chinese documentation: [README.md](README.md)
 
 ---
 
 ## Table of Contents
 
+- [🚀 Quick Start (for beginners)](GETTING_STARTED.md)
 - [What Is This](#what-is-this)
 - [The Three Skills at a Glance](#the-three-skills-at-a-glance)
 - [Repository Layout](#repository-layout)
@@ -57,6 +60,7 @@ Relationship: **mod-authoring is the dictionary; plant/zombie are two constructi
 pvz-hybrid-mod-skills/
 ├── README.md                       # Chinese documentation
 ├── README_EN.md                    # This file
+├── GETTING_STARTED.md              # 🚀 Beginner quick start (first mod in ~30 min)
 ├── LICENSE                         # MIT
 ├── skills/                         # Three skill modules; each folder installs independently
     ├── pvz-hybrid-mod-authoring/

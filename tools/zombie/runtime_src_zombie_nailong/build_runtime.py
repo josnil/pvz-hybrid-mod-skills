@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""编译「奶龙僵尸」Mod 的托管运行时程序集 Runtime/ModAssembly.dll。
+
+为什么要单独编译（纯数据做不到的部分，详见 NaiLongRuntimeEntry.cs 的类注释）：
+  · **自制 .dat 皮肤会静止** —— standalone `.dat` 不在引擎的全局图集清单里 ⇒
+    `AdobeAnimateSprite` 的 GPU 位姿时钟失效。修法只能运行期写
+    `forceLocalRender` / `forceCpuPoseRender`（无 `[Export]`，写不进 `.tscn`），
+    且引擎会 `ReleaseForcedCpuPoseData` 放掉 ⇒ 必须周期性整树扫描反复补。
+  · **每 10 秒一次大笑（出场首次不触发）** —— 墙钟节拍，数据侧没有通道。
+  · **大笑时全场植物暂停 0.5 秒** —— 数据侧只有 buff 通道；
+    这里直接改 `TowerDefenseCharacter.timeScaleInit`（每物理帧 `timeScale = timeScaleInit`）。
+  · **大笑音效** —— Mod 音频进 `ResourceManager.AUDIOS`，而 `AudioManager` 对 SFX
+    没有事件总线 ⇒ 由插件在触发时叫一次。
+  · **补进共享卡库 + 图鉴僵尸页去重** —— 纯数据到不了。
+
+入口类型 NaiLongRuntimeEntry 实现 IXWModRuntimeEntry（在 PlantsVsZombies.dll 里），
+直接调用游戏的 TowerDefenseCharacter / AdobeAnimateSprite / AudioManager /
+ResourceManager / Almanac 等公开成员，所以必须引用 GodotSharp.dll + PlantsVsZombies.dll。
+
+用法：python build_runtime.py [--check] [--godot-ref-dir <dir>]
+  --check   编译两次并比对字节，验证可重现（幂等）
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WORKSPACE = os.path.dirname(HERE)
+MOD_DIR = os.path.join(WORKSPACE, "NaiLong")
+TARGET_DLL = os.path.join(MOD_DIR, "Runtime", "ModAssembly.dll")
+
+CSPROJ = "NaiLongRuntime.csproj"
+
+DEFAULT_REF_DIR = (
+    r"D:\zzz\植物大战僵尸杂交版0.28.1\植物大战僵尸杂交重制版"
+    r"\data_PlantsVsZombies_windows_x86_64"
+)
+FALLBACK_REF_DIRS = [
+    DEFAULT_REF_DIR,
+    r"D:\zzz\植物大战僵尸杂交重制版"
+    r"\data_PlantsVsZombies_windows_x86_64",
+]
+
+
+def find_dotnet() -> str:
+    for cand in (
+        r"C:\Program Files\dotnet\dotnet.exe",
+        r"C:\Program Files (x86)\dotnet\dotnet.exe",
+    ):
+        if cand and os.path.isfile(cand):
+            return cand
+    raise SystemExit("找不到 dotnet.exe（需要 .NET SDK 才能编译运行时程序集）")
+
+
+def pick_ref_dir(explicit) -> str:
+    if explicit:
+        if not os.path.isdir(explicit):
+            raise SystemExit("--godot-ref-dir 不存在：" + explicit)
+        return explicit
+    for d in FALLBACK_REF_DIRS:
+        if os.path.isfile(os.path.join(d, "GodotSharp.dll")) and os.path.isfile(
+            os.path.join(d, "PlantsVsZombies.dll")
+        ):
+            return d
+    raise SystemExit("找不到含 GodotSharp.dll / PlantsVsZombies.dll 的目录")
+
+
+def clean_dir(path: str) -> None:
+    """增量清空目录（刻意不用 shutil.rmtree：本机删除钩子会把它变成 SHFileOperationW）。"""
+    if not os.path.isdir(path):
+        return
+    for root, dirs, files in os.walk(path, topdown=False):
+        for f in files:
+            os.remove(os.path.join(root, f))
+        for d in dirs:
+            try:
+                os.rmdir(os.path.join(root, d))
+            except OSError:
+                pass
+
+
+def build(dotnet: str, ref_dir: str, out_dir: str) -> None:
+    clean_dir(out_dir)
+    cmd = [
+        dotnet,
+        "build",
+        os.path.join(HERE, CSPROJ),
+        "-c",
+        "Release",
+        "-o",
+        out_dir,
+        "-p:GodotRefDir=" + ref_dir,
+        "--nologo",
+        "-v",
+        "quiet",
+    ]
+    proc = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        sys.stdout.write(proc.stdout or "")
+        sys.stderr.write(proc.stderr or "")
+        raise SystemExit("dotnet build 失败，exit=%d" % proc.returncode)
+    for ln in (proc.stdout + proc.stderr).splitlines():
+        if " warning " in ln.lower() or ln.lower().startswith("warning"):
+            print("   build warning:", ln.strip())
+
+
+def sha256(path: str) -> str:
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def install(out_dir: str) -> str:
+    src = os.path.join(out_dir, "ModAssembly.dll")
+    if not os.path.isfile(src):
+        raise SystemExit("编译产物里没有 ModAssembly.dll：" + out_dir)
+    os.makedirs(os.path.dirname(TARGET_DLL), exist_ok=True)
+    data = open(src, "rb").read()
+    if os.path.isfile(TARGET_DLL) and open(TARGET_DLL, "rb").read() == data:
+        return "未变"
+    with open(TARGET_DLL, "wb") as fh:
+        fh.write(data)
+    return "已写入"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true", help="编译两次比对字节，验证可重现")
+    ap.add_argument("--godot-ref-dir", default=None)
+    args = ap.parse_args()
+
+    dotnet = find_dotnet()
+    ref_dir = pick_ref_dir(args.godot_ref_dir)
+    print("dotnet   :", dotnet)
+    print("引用目录 :", ref_dir)
+
+    out1 = os.path.join(HERE, ".build", "a")
+    build(dotnet, ref_dir, out1)
+    dll1 = os.path.join(out1, "ModAssembly.dll")
+    h1 = sha256(dll1)
+    print("第 1 次   大小=%d sha256=%s" % (os.path.getsize(dll1), h1[:16]))
+
+    if args.check:
+        out2 = os.path.join(HERE, ".build", "b")
+        build(dotnet, ref_dir, out2)
+        dll2 = os.path.join(out2, "ModAssembly.dll")
+        h2 = sha256(dll2)
+        print("第 2 次   大小=%d sha256=%s" % (os.path.getsize(dll2), h2[:16]))
+        if h1 != h2:
+            print("!! 两次编译字节不一致 —— 产物不可重现")
+            return 1
+        print("两次编译字节一致 OK")
+
+    state = install(out1)
+    print("安装到   :", TARGET_DLL, "->", state)
+    print("最终 sha256 =", sha256(TARGET_DLL)[:16])
+
+    runtime_dir = os.path.dirname(TARGET_DLL)
+    if os.path.isdir(runtime_dir):
+        extra = [f for f in sorted(os.listdir(runtime_dir)) if f != "ModAssembly.dll"]
+        if extra:
+            print("!! Runtime/ 下出现了多余文件（应只有 ModAssembly.dll）：", extra)
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

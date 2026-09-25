@@ -1,0 +1,71 @@
+{
+ "atlas": {
+  "w": 2913,
+  "h": 1745
+ },
+ "media": [
+  {
+   "name": "nailong_body.png",
+   "rect": [
+    0,
+    0,
+    898,
+    1745
+   ]
+  },
+  {
+   "name": "nailong_laugh.png",
+   "rect": [
+    900,
+    0,
+    1113,
+    1370
+   ]
+  },
+  {
+   "name": "nailong_legs.png",
+   "rect": [
+    2015,
+    0,
+    898,
+    717
+   ]
+  }
+ ],
+ "canvas_h": 140.0,
+ "scale": 0.08022922636103152,
+ "body": {
+  "w": 898,
+  "h": 1745,
+  "axis_x": 465.5,
+  "bottom_y": 1745.0,
+  "crotch_y": 1052.0,
+  "belly_y": 728.0,
+  "belly_w": 863,
+  "head_w": 388
+ },
+ "legs": {
+  "rect_x": 0.0,
+  "rect_y": 1028.0,
+  "w": 898,
+  "h": 717
+ },
+ "laugh": {
+  "w": 1113,
+  "h": 1370,
+  "axis_x": 560.0,
+  "belly_y": 781.0,
+  "belly_w": 1094,
+  "head_w": 808,
+  "scale_ratio": 0.7888482632541134
+ },
+ "calib": {
+  "target_h_canvas": 140.0,
+  "ground_canvas_y": 0.0,
+  "offset": [
+   0.0,
+   38.0
+  ],
+  "note": "offset=(0,38) ⇒ 画布(0,0) 落在角色空间(0,38)；内置僵尸 offset=-80 时脚底画布 y=118 ⇒ 角色 y=38，ShadowSprite y=36"
+ }
+}

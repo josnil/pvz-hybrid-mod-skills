@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="TowerDefenseZombieConfig" format=3]
+
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/ZombieNormalArmorData.tres" id="1"]
+[ext_resource type="PackedScene" path="res://Asset/Anime/Character/Zombie/Ash/General/ZombieGeneralAsh.tscn" id="2"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/DamagePoint/ZombieNormalDamagePointData.tres" id="3"]
+[ext_resource type="Script" path="res://Resource/TowerDefense/Character/Config/TowerDefenseZombieConfig.cs" id="4"]
+
+[resource]
+script = ExtResource("4")
+attack = 100.0
+name = "ZombieNaiLong"
+hitpointsNearDeath = 70.0
+hitpoints = 1350.0
+damagePointData = ExtResource("3")
+armorData = ExtResource("1")
+customData = null
+ashScene = ExtResource("2")
+homeWorld = 1
+cost = 50
+plantGridType = [-1]
+maskFlags = 9
+metadata/_custom_type_script = "res://Resource/TowerDefense/Character/Config/TowerDefenseZombieConfig.cs"

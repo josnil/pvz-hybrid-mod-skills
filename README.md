@@ -10,10 +10,13 @@
 
 一套面向《植物大战僵尸杂交版》（Godot 4 + C#）Mod 开发的 **WorkBuddy Agent Skills（AI 技能包）**，由三个互相衔接的技能组成：一个覆盖 `.pmod` 包格式的通用底座，加上植物、僵尸两条端到端的专用流水线。全部内容来自真实项目的反复实测——每条"铁律"都对应一次踩坑，每个坑都附了根因与源码级证据。
 
+> 🚀 **第一次用？直接从 [GETTING_STARTED.md](GETTING_STARTED.md) 开始**——约 30 分钟做出第一个能进游戏的数值 Mod，不需要解包游戏、不需要写代码。
+
 ---
 
 ## 目录
 
+- [🚀 快速上手（小白必读）](GETTING_STARTED.md)
 - [这是什么](#这是什么)
 - [三个技能总览](#三个技能总览)
 - [仓库结构](#仓库结构)
@@ -56,6 +59,7 @@
 pvz-hybrid-mod-skills/
 ├── README.md                       # 本文档（中文）
 ├── README_EN.md                    # 英文文档
+├── GETTING_STARTED.md              # 🚀 小白快速上手（约 30 分钟做出第一个 Mod）
 ├── LICENSE                         # MIT
 ├── skills/                         # 三个技能模块，每个文件夹即一个可独立安装的技能
     ├── pvz-hybrid-mod-authoring/

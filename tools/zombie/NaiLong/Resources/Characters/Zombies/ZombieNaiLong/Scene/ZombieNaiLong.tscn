@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://Prefab/TowerDefense/Character/TowerDefenseZombie.tscn" id="1"]
+[ext_resource type="Resource" path="./ZombieNaiLongComponentSet.tres" id="2"]
+[ext_resource type="Resource" path="res://Resource/TowerDefense/Collision/CharacterHitBoxes/Rect_44x70_At_4_n2.tres" id="3"]
+[ext_resource type="Resource" path="../Config/TowerDefenseZombieNaiLong.tres" id="4"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/DamagePoint/Config/ZombieNormalDamagePointArm.tres" id="5"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorBlackHelmet.tres" id="6"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorBucket.tres" id="7"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorCone.tres" id="8"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/DamagePoint/Config/ZombieNormalDamagePointHead.tres" id="9"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorHelmet.tres" id="10"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorScreendoor.tres" id="11"]
+[ext_resource type="Resource" path="res://Asset/Anime/Character/Zombie/Chapter1/Normal/Armor/Config/ZombieNormalArmorSpecialHelmet.tres" id="12"]
+[ext_resource type="PackedScene" path="../Sprite/ZombieNaiLong.tscn" id="13"]
+
+[node name="ZombieNaiLong" node_paths=PackedStringArray("sprite", "headSlot") instance=ExtResource("1")]
+ComponentSet = ExtResource("2")
+HitBoxDefinition = ExtResource("3")
+walkSpeedScale = 2.0
+walkAnimeClip = "Walk1&Walk2"
+swimAnimeClip = "Swim"
+dieAnimeClip = "Death1&Death2"
+dieWaterAnimeClip = "Waterdeath"
+attackAnimeClip = "Eat"
+waterHeight = 25.0
+idleAnimeClip = "Idle1&Idle2"
+config = ExtResource("4")
+sprite = NodePath("SpriteGroup/TransformPoint/ZombieNaiLong")
+headSlot = NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/HeadSlot")
+damagePart = {
+"Arm": ExtResource("5"),
+"BlackHelmet": ExtResource("6"),
+"Bucket": ExtResource("7"),
+"Cone": ExtResource("8"),
+"Head": ExtResource("9"),
+"Helmet": ExtResource("10"),
+"Screendoor": ExtResource("11"),
+"SpecialHelmet": ExtResource("12")
+}
+damagePartSlot = {
+"Arm": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/ArmSlot"),
+"BlackHelmet": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/HeadSlot"),
+"Bucket": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/BucketSlot"),
+"Cone": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/ConeSlot"),
+"Head": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/HeadSlot"),
+"Helmet": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/HeadSlot"),
+"Screendoor": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/ScreendoorSlot"),
+"SpecialHelmet": NodePath("SpriteGroup/TransformPoint/ZombieNaiLong/HeadSlot")
+}
+metadata/mod_resource_kind = "Character"
+metadata/mod_display_name = "奶龙僵尸"
+metadata/mod_character_category = "Zombie"
+metadata/mod_character_config_path = "../Config/TowerDefenseZombieNaiLong.tres"
+metadata/mod_character_sprite_scene = "../Sprite/ZombieNaiLong.tscn"
+
+[node name="TransformPoint" parent="SpriteGroup" index="0"]
+position = Vector2(12, 33)
+
+[node name="ZombieNaiLong" parent="SpriteGroup/TransformPoint" index="0" instance=ExtResource("13")]
+position = Vector2(-12, -33)
+
+[editable path="SpriteGroup/TransformPoint/ZombieNaiLong"]
