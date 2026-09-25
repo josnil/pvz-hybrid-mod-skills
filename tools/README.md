@@ -66,6 +66,18 @@
 | `head-tools/_j15_shift.py` | 「整体移一点」按口径位移重解（`--char queen --dy N`） |
 | `head-tools/_sq_refmeasure.py` / `_sq_preview.py` / `_sq_sbs.py` / `_sq_final_cmp.py` / `_sq_scale12.py` / `_sq_overlay2.py` / `_sq_shift13.py` | 尺寸/位置量化工具组：泛洪分割量参考图 / 离线渲染扫倍率 / 并排对照 / alpha 轮廓叠加 / 四格位移对照 |
 
+**奶龙僵尸（NaiLong）——从零自制皮肤的完整案例**（2026-09-25 交付，作者：云漫行）：
+
+| 文件 | 用途 |
+|---|---|
+| `build_zombie_nailong.py` | 生成器：普通僵尸全部基础行为 + 每 10 秒大笑控场，皮肤由用户三份素材（站立图/大笑图/笑声音频）离线程序化扩帧 |
+| `nailong_art.py` / `nailong_skin.py` / `anime_io.py` | 素材抠像扩帧 / reanim 直转皮肤管线 / 动画 IO |
+| `runtime_src_zombie_nailong/` | 托管插件源码：大笑节拍、`GroundMoveComponent` 行走修复、自制皮肤 `NaiLongLocalRender`（源码，`obj/`/`.build/` 编译产物不入库，`build_runtime.py` 重新编译） |
+| `gates/nailong/check_nailong_install.py` / `check_nailong_negative.py` / `make_preview.py` | 装机核对 / 负向测试 / 预览图生成 |
+| `NaiLong/` | 完整 Mod 工程（可被编辑器直接打开）：场景/组件集/卡片/图集三件套/音效 |
+| `奶龙僵尸-交付说明.md` | ★ 交付文档：含「僵尸不会往前走」的根因复盘（`GroundMoveComponent` 只认 `_ground` 层位姿——皮肤缺 ground 层动画就会原地不动）与三轮修复实录 |
+| `奶龙僵尸-预览.png` | 成品预览图 |
+
 ### map/（地图样板：吸血鬼屋泳池）
 
 | 文件 | 用途 |
