@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    「吸血鬼屋泳池」Mod 的托管运行时程序集。
+    刻意不用 Godot.NET.Sdk（那要联网还原 Godot SDK 包 + 源码生成器）：
+    本入口只用到 Godot 的普通 API（Engine / SceneTree / Sprite2D / Image / ImageTexture /
+    Callable），不碰任何靠源码生成器产生的成员（SignalName / MethodName / 信号事件等），
+    所以直接引用游戏自带的 GodotSharp.dll + PlantsVsZombies.dll 就够了。
+    信号用字符串名 "process_frame" + 自己缓存的 Callable，避免依赖生成的事件。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>ModAssembly</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <!-- 引用目录：默认取与解包源码同源的那套安装；可由 -p:GodotRefDir=... 覆盖 -->
+    <GodotRefDir Condition="'$(GodotRefDir)' == ''">D:\zzz\植物大战僵尸杂交版0.28\植物大战僵尸杂交重制版\data_PlantsVsZombies_windows_x86_64</GodotRefDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      本目录下的离线校验脚本（如 check_entry.cs）带顶级语句，是「文件级应用」而不是库成员。
+      SDK 默认会把 **/*.cs 全捞进编译 → CS8805「使用顶级语句的程序必须是可执行文件」。
+      ⚠️ 新增工具脚本时务必一并排除，否则 build_runtime.py 会编译失败。
+    -->
+    <Compile Remove="check_*.cs" />
+    <Compile Remove="tools\**\*.cs" />
+    <None Include="check_*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Private=false：不要把 26MB 的游戏程序集复制进输出，运行时由引擎自己那份解析 -->
+    <Reference Include="GodotSharp">
+      <HintPath>$(GodotRefDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PlantsVsZombies">
+      <HintPath>$(GodotRefDir)\PlantsVsZombies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

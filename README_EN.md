@@ -5,7 +5,7 @@
 [![Game](https://img.shields.io/badge/game-PvZ%20Hybrid%20V0.28%20(Godot%204%20%2B%20C%23)-orange)]()
 
 > 🤖 **These skills run inside [WorkBuddy](https://www.workbuddy.cn).**
-> **Invitation link for new users:** <https://www.workbuddy.cn/events/invite?inviteCode=2x5jma1axhe8>
+> **Invitation link for new users:** <https://www.workbuddy.cn/events/invite?inviteCode=ryoc35nu7pi1nq>
 > This link is the **new-user invitation/registration portal of WorkBuddy**, the AI agent workbench that hosts and drives these three skills (conversational mod authoring, automatic skill loading, automated offline gates). Register through the link and you can install and use the skills from this repo right away.
 
 A **WorkBuddy Agent Skills** collection for modding *Plants vs. Zombies Hybrid Edition* (Godot 4 + C#). It consists of three interlocking skills: a universal `.pmod` package-format encyclopedia, plus two end-to-end pipelines — one for plants, one for zombies. Everything here comes from repeated, real-project testing: every "iron rule" corresponds to an actual pitfall, and every pitfall includes its root cause with engine-source-level evidence.
@@ -38,7 +38,7 @@ A mod for *PvZ Hybrid Edition* is a `.pmod` file (essentially `zip + root mod.js
 
 The three skills turn "from a one-sentence requirement to an installable, playable mod" into operational manuals an AI can execute precisely:
 
-- **Why knowledge documents instead of a pile of scripts?** The skills deliver **validated methodology and hard constraints** (package format, field semantics, firing pipeline, render pipeline, offline gate design) meant to be used together with your own generator scripts. Generator/gate scripts referenced inside the skills belong to the author's workspace; build your equivalents following the documented specs.
+- **Knowledge documents + reusable tools**: the skills deliver validated **methodology and hard constraints** (package format, field semantics, firing pipeline, render pipeline, offline gate design); the generators, gate scripts and the GUI editor they reference are published in this repo under [`tools/`](tools/README.md), ready to reuse or adapt.
 - **Why trust it?** Every conclusion defers to engine source code (`addons/ModEditor/ModSystem/`, `Script/Component/`) as the final arbiter, and the verification methodology includes negative tests that prove the gates themselves are not "fake green".
 
 ## The Three Skills at a Glance
@@ -58,7 +58,7 @@ pvz-hybrid-mod-skills/
 ├── README.md                       # Chinese documentation
 ├── README_EN.md                    # This file
 ├── LICENSE                         # MIT
-└── skills/                         # Three skill modules; each folder installs independently
+├── skills/                         # Three skill modules; each folder installs independently
     ├── pvz-hybrid-mod-authoring/
     │   └── SKILL.md                # Main skill doc (all iron rules + package-format details)
     ├── pvz-hybrid-plant-authoring/
@@ -79,6 +79,13 @@ pvz-hybrid-mod-skills/
             ├── zombie-package-and-gates.md  # 13-file package / armor / card bank
             ├── zombie-fire-and-marker.md    # Firing system / muzzle-aligned spawn point
             └── zombie-skin-and-head.md      # Skins / three-node head swap / head-fit quantification
+└── tools/                          # Companion toolchain & template generators (see tools/README.md)
+    ├── pmod-toolchain/             # .pmod build/verify/hot-patch + GUI editor + pure-resource sample mod
+    ├── plant/                      # Plant pipeline template generator + plugin source + offline gates
+    ├── zombie/                     # Zombie templates ×3 + shared sources + gates + head-fit tools
+    ├── map/                        # Map pipeline template + gates
+    ├── skin/                       # Classic reanim → .dat/.tres/atlas conversion pipeline
+    └── case-docs/                  # Five full case-study delivery documents
 ```
 
 ## Installation & Configuration
@@ -174,7 +181,7 @@ pvz-hybrid-mod-skills/
 
 | Dependency | Purpose | Notes |
 |---|---|---|
-| **WorkBuddy** (recommended) | Runtime host for the skills | Register via the [invitation link](https://www.workbuddy.cn/events/invite?inviteCode=2x5jma1axhe8); works as plain docs without it |
+| **WorkBuddy** (recommended) | Runtime host for the skills | Register via the [invitation link](https://www.workbuddy.cn/events/invite?inviteCode=ryoc35nu7pi1nq); works as plain docs without it |
 | **PvZ Hybrid Edition V0.28 (unpacked)** | Ground-truth source | Skills read `addons/ModEditor/ModSystem/` (`ModLoader.cs`, `XWModManifest.cs`, …) and the `Asset/` structure |
 | **Python ≥ 3.13** | Generators / gates / validators | Pure-math scripts need no third-party packages |
 | **Pillow (PIL)** | Skin conversion, matting, offline rendering, comparison images | `pip install pillow` |
@@ -187,9 +194,11 @@ pvz-hybrid-mod-skills/
 | **Node.js (optional)** | A few tool scripts |
 | **Classic PvZ assets (reanim)** | For the "official-asset conversion" skin route (conversion scripts are not bundled; build your own per the documented pipeline) |
 
-### What is NOT in this repo (honest scope)
+### Companion tools & templates (tools/)
 
-This repository delivers **knowledge documents (Agent Skills)**, not executables. Author-workspace tools referenced by the skills (e.g. the `build_plant_super_gatling.py` generator, `mod_editor.py`, various gate scripts) are not included. The documented specs are complete — fields, byte layouts, criteria, negative cases — so equivalent scripts can be implemented from the docs alone.
+The tools referenced by the skills **are now shipped in this repo** — see [tools/README.md](tools/README.md): the `.pmod` toolchain (`build_pmod.py` / `verify_pmod.py` / stat hot-patch / GUI editor `mod_editor.py`), template generators and managed C# plugin sources for all four pipelines, offline gate & head-fit quantification scripts, the official-asset conversion pipeline (reanim → `.dat`/`.tres`/atlas), and five full case-study delivery documents.
+
+⚠️ These scripts come from the author's Windows environment and **some paths are hardcoded** (unpacked game tree, dual game builds). Replace them with your own paths per the "environment adaptation" section in `tools/README.md`. Version baseline is V0.28; after engine updates, defer to `addons/ModEditor/ModSystem/` source as the final arbiter.
 
 ## Standard Workflow (How the Skills Fit Together)
 

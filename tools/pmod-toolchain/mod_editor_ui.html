@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PVZ 杂交版 Mod 编辑器</title>
+<style>
+:root{
+  --bg:#1b1b1f; --panel:#232329; --panel2:#2a2a31; --panel3:#31313a;
+  --border:#3a3a43; --border2:#4a4a55;
+  --text:#e6e6ea; --muted:#9a9aa6; --dim:#75757f;
+  --accent:#8b82e8; --accent2:#a89ff5;
+  --ok:#4ec9a0; --warn:#e0a53a; --bad:#e0605a; --changed:#f0b429;
+  --mono:ui-monospace,Consolas,"Cascadia Mono",monospace;
+  --sans:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.55 var(--sans);
+     display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:var(--text);background:var(--panel3);border:1px solid var(--border2);
+       border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{background:#3d3d48;border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.pri:hover{background:var(--accent2)}
+button.danger{border-color:#6b3030;color:#f0b0ad}
+button.danger:hover{background:#4a2020}
+input,select,textarea{font:inherit;color:var(--text);background:var(--panel);
+  border:1px solid var(--border2);border-radius:5px;padding:4px 7px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+input[type=checkbox]{width:auto;padding:0;accent-color:var(--accent)}
+input[type=color]{width:34px;height:24px;padding:1px;flex:0 0 auto}
+label{color:var(--muted);font-size:12px}
+
+/* header */
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);
+       border-bottom:1px solid var(--border);flex:0 0 auto;flex-wrap:wrap}
+header h1{font-size:14px;font-weight:500;margin:0;white-space:nowrap}
+header h1 span{color:var(--accent2)}
+.paths{display:flex;gap:14px;font-size:11px;color:var(--dim);flex:1;min-width:0;flex-wrap:wrap}
+.paths code{font-family:var(--mono);color:var(--muted);background:var(--panel2);
+  padding:1px 5px;border-radius:3px;word-break:break-all}
+.badge{font-size:10px;padding:1px 6px;border-radius:9px;background:var(--panel3);
+       border:1px solid var(--border2);color:var(--muted)}
+.badge.ok{color:var(--ok);border-color:#2e5c4c}
+.badge.bad{color:var(--bad);border-color:#5c2e2e}
+
+/* layout */
+main{display:flex;flex:1;min-height:0}
+aside{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+#left{flex:0 0 236px;border-right:1px solid var(--border)}
+#right{flex:0 0 328px;border-left:1px solid var(--border);overflow-y:auto;overflow-x:hidden}
+#center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.sect{border-bottom:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.sect>h2{font-size:11px;font-weight:500;text-transform:none;color:var(--dim);margin:0;
+  padding:7px 10px;background:var(--panel2);letter-spacing:.3px;flex:0 0 auto;
+  display:flex;align-items:center;gap:6px}
+.sect>.body{overflow:auto;min-height:0;padding:6px}
+.sect.grow{flex:1}
+
+/* ⚠️ 左栏两块的**高度分配**必须与内容多少无关。
+   踩过的坑：不要用 `max-height:38%` 这种依赖父元素高度的百分比 —— 父 .sect 的高度是
+   auto（由内容撑），百分比解析不定，于是「资源类别」按内容全高(19 项≈555px)把自己的
+   父块撑到 587px；等父块高度被 flex 固化后 38% 才生效把列表裁短，但父块已经占着 587px，
+   剩下的高度不足以给「键」区（flex:1 的 basis 是 0%，负剩余空间下分不到收缩量），
+   键区塌成 1px、搜索框溢出容器并被底栏遮住 —— 浏览器可视高度 ≲800px 时必现。
+   改用 flex-basis 百分比：它相对 #left 的高度，而 #left 的高度由 main 拉伸决定，是确定值。 */
+#left>.sect.cats{flex:0 1 38%}
+#left>.sect.grow{flex:1 1 62%}
+#left .sect>.body{flex:1 1 auto;min-height:0}
+
+/* ⚠️ 右栏 5 个区块的总高度可能超过可用高度（窄窗口下必超）。
+   若允许它们互相压缩：底部区块塌成 1px、上方区块的内容溢出到兄弟区块底下
+   ——「构建并安装」按钮就是这么被下一个区块的标题盖住、点都点不到的。
+   所以这里反过来：右栏整体可滚，各区块【都不收缩】，预览区只在有多余空间时撑开。
+   （各 body 上的 26vh/16vh/20vh 是相对视口的，是确定值，可以放心用。） */
+#right>.sect{flex:0 0 auto}
+#right>.sect.grow{flex:1 0 auto}
+#right>.sect.grow>.body{max-height:32vh}
+
+/* lists */
+.row{display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:5px;cursor:pointer;
+     font-size:12px;border:1px solid transparent}
+.row:hover{background:var(--panel2)}
+.row.on{background:#35314f;border-color:var(--accent)}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ct{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.row .tag{font-size:9px;padding:0 4px;border-radius:3px;background:var(--panel3);color:var(--muted)}
+.row.miss .nm{color:var(--dim);text-decoration:line-through}
+.row.dis{opacity:.55;cursor:not-allowed}
+
+/* form */
+.toolbar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--panel);
+  border-bottom:1px solid var(--border);flex:0 0 auto;flex-wrap:wrap}
+.toolbar .title{font-weight:500}
+.toolbar .sub{font-size:11px;color:var(--dim);font-family:var(--mono)}
+#form{overflow:auto;padding:10px 12px 40px;flex:1}
+.grp{margin-bottom:14px}
+.grp>h3{font-size:12px;font-weight:500;color:var(--accent2);margin:0 0 6px;
+  padding-bottom:4px;border-bottom:1px solid var(--border)}
+.fld{display:grid;grid-template-columns:190px 1fr auto;gap:8px;align-items:center;
+  padding:4px 6px;border-radius:5px;border:1px solid transparent}
+.fld:hover{background:var(--panel2)}
+.fld.changed{background:#3a3218;border-color:#6b5a20}
+.fld.unset{background:#1e2f3a;border-color:#31566b}
+.fld .k{display:flex;flex-direction:column;gap:1px;min-width:0}
+.fld .k b{font-weight:400;font-size:12px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.fld .k em{font-style:normal;font-size:10px;color:var(--dim);font-family:var(--mono)}
+.fld .v{display:flex;gap:5px;align-items:center;min-width:0}
+.fld .v input[type=number]{width:92px}
+.fld .v .pair input{width:74px}
+.fld .a{display:flex;gap:3px;opacity:0}
+.fld:hover .a,.fld.changed .a,.fld.unset .a{opacity:1}
+.fld .a button{padding:2px 6px;font-size:11px}
+.dflt{font-size:10px;color:var(--dim);font-family:var(--mono);white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.ro{color:var(--dim);font-family:var(--mono);font-size:11px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+.drop{border:1px dashed var(--border2);border-radius:8px;padding:22px 14px;text-align:center;
+  color:var(--muted);font-size:12px;cursor:pointer;background:var(--panel2);transition:.12s}
+.drop:hover,.drop.over{border-color:var(--accent);background:#33314a;color:var(--text)}
+.drop.bad{border-color:var(--warn)}
+
+/* preview / output */
+pre{margin:0;font-family:var(--mono);font-size:11px;line-height:1.5;color:#c8c8d0;
+    white-space:pre;overflow:auto;padding:8px 10px;background:#17171b;border-radius:6px}
+.meta{display:grid;grid-template-columns:80px 1fr;gap:6px 8px;align-items:center}
+.meta label{align-self:center}
+.ent{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;
+     cursor:pointer;font-size:12px;border:1px solid transparent}
+.ent:hover{background:var(--panel2)}
+.ent.on{background:#35314f;border-color:var(--accent)}
+.ent .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ent .mode{font-size:9px;padding:0 5px;border-radius:3px}
+.ent .mode.ov{background:#4a3a1a;color:#e0b060}
+.ent .mode.pv{background:#1a3a4a;color:#60c0e0}
+.ent .x{opacity:0;padding:0 5px;font-size:11px}
+.ent:hover .x{opacity:1}
+.vlist{display:flex;flex-direction:column;gap:2px}
+.v{display:flex;gap:6px;align-items:flex-start;font-size:11px;font-family:var(--mono);
+   padding:2px 4px;border-radius:3px}
+.v.FAIL{background:#3a1c1c;color:#f0a09a}
+.v.WARN{background:#3a3018;color:#e8c070}
+.v.OK{color:var(--dim)}
+.v .c{flex:0 0 auto;color:var(--accent2)}
+footer{flex:0 0 auto;height:104px;background:var(--panel);border-top:1px solid var(--border);
+  display:flex;flex-direction:column}
+footer>h2{font-size:11px;color:var(--dim);margin:0;padding:5px 10px;background:var(--panel2);
+  font-weight:500;display:flex;justify-content:space-between;align-items:center}
+#log{flex:1;overflow:auto;padding:4px 10px;font-family:var(--mono);font-size:11px;line-height:1.5}
+#log div{white-space:pre-wrap;word-break:break-all}
+#log .o{color:var(--muted)} #log .g{color:var(--ok)}
+#log .w{color:var(--warn)} #log .e{color:var(--bad)} #log .h{color:var(--accent2)}
+.hint{color:var(--dim);font-size:11px;padding:14px;text-align:center;line-height:1.7}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#3d3d47;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#4d4d59}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PVZ 杂交版 <span>Mod 编辑器</span></h1>
+  <div class="paths">
+    <span>解包 <code id="p-unpack">…</code></span>
+    <span>Mods <code id="p-mods">…</code></span>
+    <span id="p-proj"></span>
+  </div>
+  <button onclick="reindex()">重建索引</button>
+  <button onclick="reveal('mods')">打开 Mods 目录</button>
+  <button onclick="reveal('dist')">打开产物目录</button>
+</header>
+
+<main>
+  <!-- 左：类别 + 键 -->
+  <aside id="left">
+    <div class="sect cats">
+      <h2>资源类别</h2>
+      <div class="body" id="cats"></div>
+    </div>
+    <div class="sect grow">
+      <h2>键 <span class="ct" id="keycount"></span></h2>
+      <div style="padding:5px 6px;flex:0 0 auto">
+        <input id="keysearch" placeholder="搜索键名…" oninput="renderKeys()">
+      </div>
+      <div class="body" id="keys"><div class="hint">先选一个类别</div></div>
+    </div>
+  </aside>
+
+  <!-- 中：字段表单 -->
+  <section id="center">
+    <div class="toolbar">
+      <span class="title" id="f-title">未选择条目</span>
+      <span class="sub" id="f-sub"></span>
+      <span style="flex:1"></span>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="only-changed" onchange="renderForm()"> 只看已改
+      </label>
+      <button onclick="resetAll()" id="btn-reset" disabled>全部还原</button>
+      <button onclick="copyAsNew()" id="btn-copy" disabled>复制为新键</button>
+    </div>
+    <div id="form"><div class="hint">
+      左侧选类别 → 点一个键，就会以它为「基底」加载全部可改字段。<br>
+      改动会实时生成 .pmod，右侧点「构建并安装」即可进游戏测试。
+    </div></div>
+  </section>
+
+  <!-- 右：工程 + 预览 + 构建 -->
+  <aside id="right">
+    <div class="sect">
+      <h2>Mod 信息</h2>
+      <div class="body">
+        <div class="meta">
+          <label>名称</label><input id="m-name" oninput="metaChanged()">
+          <label>标识 id</label><input id="m-id" oninput="metaChanged()" placeholder="建议填英文，如 pea_strong">
+          <label>版本</label><input id="m-version" oninput="metaChanged()">
+          <label>作者</label><input id="m-author" oninput="metaChanged()">
+          <label>说明</label><input id="m-desc" oninput="metaChanged()">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="pri" style="flex:1" onclick="build()" id="btn-build">构建并安装</button>
+          <button onclick="doPreview()">刷新预览</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h2>工程条目 <span class="ct" id="entcount"></span></h2>
+      <div class="body vlist" id="entries" style="max-height:26vh"></div>
+    </div>
+
+    <div class="sect grow">
+      <h2>产物预览 <span class="ct" id="prevname"></span></h2>
+      <div class="body" id="preview"><div class="hint">改动后自动生成</div></div>
+    </div>
+
+    <div class="sect">
+      <h2>校验结果 <span class="ct" id="vsum"></span></h2>
+      <div class="body vlist" id="validation" style="max-height:16vh"></div>
+    </div>
+
+    <div class="sect">
+      <h2>已安装 Mod <span class="ct" id="instcount"></span></h2>
+      <div class="body vlist" id="installed" style="max-height:20vh"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <h2><span>输出</span><button style="padding:1px 8px;font-size:11px" onclick="clearLog()">清空</button></h2>
+  <div id="log"></div>
+</footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const S = {
+  state: null,
+  cat: null,
+  keys: [],
+  detail: null,
+  activeRel: null,
+  project: { meta: { id:"", name:"", version:"1.0.0", author:"", description:"" }, entries: [] },
+};
+
+/* ------------------------------------------------ 工具 */
+function log(msg, cls) {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = msg;
+  const box = $("log");
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog(){ $("log").innerHTML = ""; }
+
+async function api(path, body) {
+  const opt = body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const txt = await r.text();
+  let j;
+  try { j = JSON.parse(txt); } catch (e) { throw new Error(path + " 返回非 JSON: " + txt.slice(0, 300)); }
+  if (j && j.error) { log("!! " + j.error, "e"); if (j.trace) console.error(j.trace); }
+  return j;
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
+  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+/* 值 -> .tres 字面量（与后端 python_to_literal 对齐） */
+function numLit(v) {
+  const f = Number(v);
+  if (!isFinite(f)) return "0.0";
+  return Number.isInteger(f) ? f + ".0" : String(f);
+}
+function toLiteral(f, v) {
+  switch (f.kind) {
+    case "bool": return v ? "true" : "false";
+    case "int": return String(Math.round(Number(v) || 0));
+    case "float": return numLit(v);
+    case "vec2": return "Vector2(" + numLit(v[0]) + ", " + numLit(v[1]) + ")";
+    case "vec2i": return "Vector2i(" + Math.round(v[0]||0) + ", " + Math.round(v[1]||0) + ")";
+    case "color": return "Color(" + (v||[]).map(numLit).join(", ") + ")";
+    case "enumtype": return String(Math.round(Number(v) || 0));
+    default: return JSON.stringify(String(v == null ? "" : v));
+  }
+}
+
+/* ------------------------------------------------ 启动 */
+async function boot() {
+  log("加载编辑器状态…", "h");
+  S.state = await api("/api/state");
+  $("p-unpack").textContent = S.state.unpack + (S.state.unpackExists ? "" : "  ← 不存在！");
+  $("p-mods").textContent = S.state.modsDir + (S.state.modsDirExists ? "" : "  ← 不存在");
+  $("p-proj").innerHTML = "工程 <code>" + esc(S.state.projectFile) + "</code>";
+  S.project = S.state.project || S.project;
+  S.project.meta = Object.assign({ id:"", name:"", version:"1.0.0", author:"", description:"" }, S.project.meta);
+  S.project.entries = S.project.entries || [];
+  syncMetaInputs();
+  renderCategories();
+  renderEntries();
+  renderInstalled();
+  log("就绪。类别 " + S.state.categories.length + " 个，已装 Mod " +
+      (S.state.installed || []).length + " 个。", "g");
+  if (!S.state.unpackExists) log("!! 解包目录不存在，先把游戏解包目录放好或用 --unpack 指定。", "e");
+}
+
+function syncMetaInputs() {
+  $("m-name").value = S.project.meta.name || "";
+  $("m-id").value = S.project.meta.id || "";
+  $("m-version").value = S.project.meta.version || "";
+  $("m-author").value = S.project.meta.author || "";
+  $("m-desc").value = S.project.meta.description || "";
+}
+
+/* ------------------------------------------------ 左栏 */
+function renderCategories() {
+  const box = $("cats");
+  box.innerHTML = "";
+  for (const c of S.state.categories) {
+    const d = document.createElement("div");
+    d.className = "row" + (S.cat === c.id ? " on" : "") + (c.supported ? "" : " dis");
+    d.title = c.desc || "";
+    d.innerHTML = '<span class="nm">' + esc(c.label) +
+      '</span><span class="tag">' + esc(c.id) + '</span>';
+    if (c.supported) d.onclick = () => pickCategory(c.id);
+    else d.onclick = () => log("「" + c.label + "」暂不支持：" + c.desc, "w");
+    box.appendChild(d);
+  }
+}
+
+async function pickCategory(cat) {
+  S.cat = cat;
+  renderCategories();
+  $("keys").innerHTML = '<div class="hint">读取键列表…</div>';
+  const r = await api("/api/keys?category=" + encodeURIComponent(cat));
+  S.keys = r.keys || [];
+  if (r.note) log("[" + cat + "] " + r.note, "o");
+  log("[" + cat + "] " + S.keys.length + " 个键", "h");
+  renderKeys();
+}
+
+function renderKeys() {
+  const box = $("keys");
+  const q = ($("keysearch").value || "").toLowerCase();
+  const list = S.keys.filter(k => !q || k.key.toLowerCase().includes(q));
+  $("keycount").textContent = list.length + "/" + S.keys.length;
+  if (!list.length) { box.innerHTML = '<div class="hint">没有匹配的键</div>'; return; }
+  const frag = document.createDocumentFragment();
+  const used = new Set(S.project.entries.map(e => e.category + "/" + e.key));
+  for (const k of list) {
+    const d = document.createElement("div");
+    d.className = "row" + (k.hasFile ? "" : " miss");
+    d.title = (k.file || "解包目录里没有对应文件") + "\n" + (k.uid || "");
+    d.innerHTML = '<span class="nm">' + esc(k.key) + '</span>' +
+      (used.has(S.cat + "/" + k.key) ? '<span class="tag">已加</span>' : '') +
+      (k.hasFile ? '' : '<span class="tag">缺</span>');
+    d.onclick = () => openKey(S.cat, k.key);
+    frag.appendChild(d);
+  }
+  box.innerHTML = "";
+  box.appendChild(frag);
+}
+
+/* ------------------------------------------------ 条目与表单 */
+function findEntry(cat, key) {
+  return S.project.entries.findIndex(e => e.category === cat && e.key === key);
+}
+
+async function openKey(cat, key, mode, baseKey) {
+  mode = mode || "override";
+  let idx = findEntry(cat, key);
+  if (idx < 0) {
+    S.project.entries.push({ mode: mode, category: cat, key: key,
+      baseKey: baseKey || key, edits: {}, unset: [] });
+    idx = S.project.entries.length - 1;
+  }
+  await activate(idx);
+  renderKeys();
+}
+
+async function activate(idx) {
+  const e = S.project.entries[idx];
+  if (!e) return;
+  S.activeIdx = idx;
+  $("f-title").textContent = e.category + " / " + e.key;
+  $("f-sub").textContent = (e.mode === "provide" ? "新增（基底 " + (e.baseKey||e.key) + "）" : "覆盖") +
+    "  · 已改 " + editCount(e) + " 项";
+  $("form").innerHTML = '<div class="hint">读取字段…</div>';
+  const d = await api("/api/resource?category=" + encodeURIComponent(e.category) +
+                      "&key=" + encodeURIComponent(e.baseKey || e.key));
+  S.detail = d;
+  const cfg = (S.state.categories.find(c => c.id === e.category) || {});
+  S.activeRel = (cfg.out || "Resources/???") + "/" + e.key +
+                ((d.file && d.file.match(/\.[a-z0-9]+$/i)) ? d.file.match(/\.[a-z0-9]+$/i)[0] : ".tres");
+  $("btn-reset").disabled = false;
+  $("btn-copy").disabled = false;
+  renderForm();
+  renderEntries();
+  doPreview();
+}
+
+function fieldChanged(e, name) { return (e.edits || {})[name] !== undefined; }
+function fieldUnset(e, name) { return (e.unset || []).indexOf(name) >= 0; }
+/* 改动计数 = 改值 + 设为默认，两者都会让产物变化 */
+function editCount(e) { return Object.keys(e.edits || {}).length + (e.unset || []).length; }
+
+function renderForm() {
+  const e = S.project.entries[S.activeIdx];
+  const d = S.detail;
+  const box = $("form");
+  if (!e || !d) return;
+  if (d.kind === "binary") { renderBinaryForm(e, d); return; }
+  if (d.error && d.kind !== "tres") {
+    box.innerHTML = '<div class="hint">' + esc(d.error) + '</div>';
+    return;
+  }
+  if (!d.fields || !d.fields.length) {
+    box.innerHTML = '<div class="hint">这个资源没有解析到可编辑字段。<br>' +
+      '原文件：' + esc(d.file || "无") + '</div>';
+    return;
+  }
+  const onlyChanged = $("only-changed").checked;
+  const byGroup = new Map();
+  for (const f of d.fields) {
+    // 「已设为默认」(unset) 也算改动，否则开了只看已改就看不到、也撤不回
+    if (onlyChanged && !fieldChanged(e, f.name) && !fieldUnset(e, f.name)) continue;
+    if (!byGroup.has(f.group)) byGroup.set(f.group, []);
+    byGroup.get(f.group).push(f);
+  }
+  if (!byGroup.size) { box.innerHTML = '<div class="hint">还没有任何改动。</div>'; return; }
+
+  box.innerHTML = "";
+  for (const [grp, fields] of byGroup) {
+    const g = document.createElement("div");
+    g.className = "grp";
+    g.innerHTML = "<h3>" + esc(grp) + "</h3>";
+    for (const f of fields) g.appendChild(fieldRow(e, f));
+    box.appendChild(g);
+  }
+  // 原版 .tres 里存在但不属于导出字段的属性
+  if (d.extraProps && d.extraProps.length) {
+    const g = document.createElement("div");
+    g.className = "grp";
+    g.innerHTML = "<h3>其它属性（原版 .tres 自带）</h3>";
+    for (const p of d.extraProps) {
+      const r = document.createElement("div");
+      r.className = "fld";
+      r.innerHTML = '<div class="k"><b>' + esc(p.name) + '</b><em>raw</em></div>' +
+        '<div class="v"><span class="ro">' + esc(p.rawValue) + '</span></div><div class="a"></div>';
+      g.appendChild(r);
+    }
+    box.appendChild(g);
+  }
+}
+
+/* 文件替换型条目（音频等）：只能换文件，没有可改字段 */
+function renderBinaryForm(e, d) {
+  const box = $("form");
+  const wantExt = (d.file && d.file.match(/\.[a-z0-9]+$/i)) ? d.file.match(/\.[a-z0-9]+$/i)[0] : "";
+  const cur = e.sourceFile;
+  const curName = cur ? cur.split(/[\\/]/).pop() : "";
+  const badExt = cur && wantExt && !cur.toLowerCase().endsWith(wantExt.toLowerCase());
+
+  box.innerHTML = "";
+  const g = document.createElement("div");
+  g.className = "grp";
+  g.innerHTML = "<h3>文件替换</h3>" +
+    '<div class="hint" style="text-align:left;padding:6px 4px">' +
+    '这个键是<b>整文件替换</b>型（原版：<code style="font-family:var(--mono)">' + esc(d.file || "") + '</code>）。' +
+    '<br>点下面的区域选一个文件，或把文件拖进来。' +
+    '<br>建议保持扩展名 <b style="color:var(--accent2)">' + esc(wantExt || "(原扩展名)") + '</b>，' +
+    '否则 Godot 按扩展名挑 loader，可能加载不了。</div>';
+
+  const drop = document.createElement("div");
+  drop.className = "drop" + (badExt ? " bad" : "");
+  drop.innerHTML = cur
+    ? '<b>' + esc(curName) + '</b><br><span style="font-family:var(--mono);font-size:10px">' + esc(cur) + '</span>'
+    : '点击选择文件，或拖到此处';
+  const fi = document.createElement("input");
+  fi.type = "file";
+  fi.style.display = "none";
+  fi.onchange = () => { if (fi.files[0]) uploadReplacement(e, fi.files[0], wantExt); };
+  drop.onclick = () => fi.click();
+  drop.ondragover = ev => { ev.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = ev => {
+    ev.preventDefault(); drop.classList.remove("over");
+    if (ev.dataTransfer.files[0]) uploadReplacement(e, ev.dataTransfer.files[0], wantExt);
+  };
+  g.appendChild(drop);
+  g.appendChild(fi);
+
+  if (cur) {
+    const bar = document.createElement("div");
+    bar.style.cssText = "display:flex;gap:6px;margin-top:8px";
+    const bDel = document.createElement("button");
+    bDel.className = "danger"; bDel.textContent = "去掉替换文件";
+    bDel.onclick = () => { delete e.sourceFile; log("取消替换 " + e.key, "o"); renderForm(); touch(); };
+    bar.appendChild(bDel);
+    if (badExt) {
+      const w = document.createElement("span");
+      w.style.cssText = "color:var(--warn);font-size:11px;align-self:center";
+      w.textContent = "⚠ 扩展名与" + wantExt + "不一致";
+      bar.appendChild(w);
+    }
+    g.appendChild(bar);
+  }
+
+  box.appendChild(g);
+}
+
+function uploadReplacement(e, file, wantExt) {
+  if (file.size > 24 * 1024 * 1024) {
+    if (!confirm("文件 " + (file.size / 1048576).toFixed(1) + " MB，比较大，继续吗？")) return;
+  }
+  const r = new FileReader();
+  r.onload = async () => {
+    const b64 = String(r.result).split(",")[1] || "";
+    const res = await api("/api/upload", { name: file.name, base64: b64 });
+    if (!res.ok) { log("!! 上传失败：" + (res.error || ""), "e"); return; }
+    e.sourceFile = res.path;
+    log("替换 " + e.key + " → " + file.name + " (" + (res.size / 1024).toFixed(1) + " KB)", "o");
+    if (wantExt && !file.name.toLowerCase().endsWith(wantExt.toLowerCase())) {
+      log("!! 扩展名 " + file.name.split(".").pop() + " 与原版 " + wantExt + " 不一致，游戏可能加载失败", "w");
+    }
+    renderForm(); touch();
+  };
+  r.readAsDataURL(file);
+}
+
+function fieldRow(e, f) {
+  const row = document.createElement("div");
+  const chg = fieldChanged(e, f.name);
+  const uns = fieldUnset(e, f.name);
+  row.className = "fld" + (chg ? " changed" : (uns ? " unset" : ""));
+  const cur = chg ? e.edits[f.name] : null;
+
+  const k = document.createElement("div");
+  k.className = "k";
+  k.innerHTML = "<b>" + esc(f.name) + "</b><em>" + esc(f.kind) + " · " + esc(f.csharpType) +
+    (f.present ? " · tres" : " · 默认") + (uns ? " · ⌀ 删除" : "") + "</em>";
+
+  const v = document.createElement("div");
+  v.className = "v";
+
+  if (!f.editable) {
+    v.innerHTML = '<span class="ro" title="' + esc(f.reason || "") + '">' +
+      esc(f.present ? f.rawValue : "（默认值，不写入）") + '  ⛔ ' + esc(f.reason || "不可编辑") + '</span>';
+  } else if (f.kind === "bool") {
+    const i = document.createElement("input");
+    i.type = "checkbox";
+    i.checked = !!(chg ? (cur === "true") : f.value);
+    i.onchange = () => setEdit(f, i.checked);
+    v.appendChild(i);
+  } else if (f.kind === "enum" || f.kind === "enumtype") {
+    const s = document.createElement("select");
+    const opts = f.kind === "enum"
+      ? (f.options || []).map(o => ({ name: o, value: o }))
+      : (f.options || []);
+    const current = chg ? (f.kind === "enumtype" ? parseInt(cur, 10) : JSON.parse(cur))
+                        : f.value;
+    if (!opts.length) {
+      const i = document.createElement("input");
+      i.type = "number"; i.value = Number(current) || 0;
+      i.onchange = () => setEdit(f, Number(i.value));
+      v.appendChild(i);
+    } else {
+      for (const o of opts) {
+        const op = document.createElement("option");
+        op.value = String(o.value); op.textContent = o.name + " (" + o.value + ")";
+        if (String(o.value) === String(current)) op.selected = true;
+        s.appendChild(op);
+      }
+      s.onchange = () => setEdit(f, f.kind === "enumtype" ? Number(s.value) : s.value);
+      v.appendChild(s);
+    }
+  } else if (f.kind === "int" || f.kind === "float") {
+    const i = document.createElement("input");
+    i.type = "number";
+    if (f.step != null) i.step = f.kind === "int" ? 1 : (f.step || 0.01);
+    if (f.min != null) i.min = f.min;
+    if (f.max != null) i.max = f.max;
+    i.value = chg ? cur : (f.value == null ? 0 : f.value);
+    i.onchange = () => setEdit(f, Number(i.value));
+    v.appendChild(i);
+  } else if (f.kind === "vec2" || f.kind === "vec2i") {
+    const val = chg ? JSON.parse(cur) : (f.value || [0, 0]);
+    v.classList.add("pair");
+    for (let n = 0; n < 2; n++) {
+      const i = document.createElement("input");
+      i.type = "number"; i.step = f.kind === "vec2i" ? 1 : 0.1;
+      i.value = val[n];
+      i.onchange = () => {
+        const arr = chg ? JSON.parse(e.edits[f.name]) : [].concat(f.value || [0, 0]);
+        arr[n] = Number(i.value);
+        setEdit(f, arr);
+      };
+      v.appendChild(i);
+    }
+  } else if (f.kind === "color") {
+    const val = chg ? JSON.parse(cur) : (f.value || [1, 1, 1, 1]);
+    const cp = document.createElement("input");
+    cp.type = "color";
+    cp.value = "#" + val.slice(0, 3).map(x =>
+      Math.round(Math.min(1, Math.max(0, x)) * 255).toString(16).padStart(2, "0")).join("");
+    const ap = document.createElement("input");
+    ap.type = "number"; ap.step = 0.05; ap.min = 0; ap.max = 1; ap.value = val[3];
+    ap.style.width = "70px";
+    const emit = () => {
+      const h = cp.value;
+      setEdit(f, [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255,
+                  parseInt(h.slice(5,7),16)/255, Number(ap.value)]);
+    };
+    cp.onchange = emit; ap.onchange = emit;
+    v.appendChild(cp); v.appendChild(ap);
+  } else {
+    const i = document.createElement("input");
+    i.type = "text";
+    i.value = chg ? JSON.parse(cur) : (f.value == null ? "" : f.value);
+    i.onchange = () => setEdit(f, i.value);
+    v.appendChild(i);
+  }
+
+  const a = document.createElement("div");
+  a.className = "a";
+  if (chg || uns) {
+    const b1 = document.createElement("button");
+    b1.textContent = "↺ 还原"; b1.title = "恢复原版 .tres 里的值";
+    b1.onclick = () => resetField(f);
+    a.appendChild(b1);
+  }
+  if (f.editable) {
+    const b2 = document.createElement("button");
+    b2.textContent = "⌀ 用默认"; b2.title = "从 .tres 里删掉这个属性，回落到 C# 类默认值";
+    b2.onclick = () => defaultField(f);
+    a.appendChild(b2);
+  }
+  row.appendChild(k); row.appendChild(v); row.appendChild(a);
+  return row;
+}
+
+/* ------------------------------------------------ 编辑动作 */
+function touch() {
+  const e = S.project.entries[S.activeIdx];
+  if (e) {
+    $("f-sub").textContent = (e.mode === "provide" ? "新增（基底 " + (e.baseKey||e.key) + "）" : "覆盖") +
+      "  · 已改 " + editCount(e) + " 项";
+  }
+  renderEntries();
+  scheduleSave();
+  doPreview();
+}
+function setEdit(f, val) {
+  const e = S.project.entries[S.activeIdx];
+  e.edits = e.edits || {};
+  e.edits[f.name] = toLiteral(f, val);
+  e.unset = (e.unset || []).filter(n => n !== f.name);
+  log("改 " + e.key + "." + f.name + " = " + e.edits[f.name], "o");
+  renderForm(); touch();
+}
+function resetField(f) {
+  const e = S.project.entries[S.activeIdx];
+  if (!e) return;
+  delete (e.edits || {})[f.name];
+  e.unset = (e.unset || []).filter(n => n !== f.name);
+  log("还原 " + e.key + "." + f.name, "o");
+  renderForm(); touch();
+}
+function defaultField(f) {
+  const e = S.project.entries[S.activeIdx];
+  if (!e) return;
+  delete (e.edits || {})[f.name];
+  if (!f.present) {
+    log(f.name + " 原本就不在 .tres 里，已经是默认值", "o");
+    renderForm(); touch();
+    return;
+  }
+  e.unset = e.unset || [];
+  if (e.unset.indexOf(f.name) < 0) e.unset.push(f.name);
+  log("用默认 " + e.key + "." + f.name + "（从 .tres 删除该属性）", "o");
+  renderForm(); touch();
+}
+function resetAll() {
+  const e = S.project.entries[S.activeIdx];
+  if (!e) return;
+  e.edits = {}; e.unset = [];
+  log("清空 " + e.key + " 的改动", "o");
+  renderForm(); touch();
+}
+async function copyAsNew() {
+  const e = S.project.entries[S.activeIdx];
+  if (!e) return;
+  const base = (e.baseKey || e.key);
+  const nk = prompt("新键名（会作为 provides 新增，别和现有键重名）", base + "Mod");
+  if (!nk) return;
+  await openKey(e.category, nk, "provide", base);
+  // 基底 .tres 里的 name/标识字段不会自己变，补一条自动改名避免游戏内撞名
+  const ne = S.project.entries[S.activeIdx];
+  const nm = (S.detail && S.detail.fields || []).find(f => f.name === "name" && f.kind === "string");
+  if (nm && !ne.renameField) {
+    ne.renameField = "name";
+    log("已自动把 name 字段设为 " + nk + "（可在表单里改成你想要的名字）", "o");
+    renderForm(); scheduleSave(); doPreview();
+  }
+  log("新增键 " + nk + "（基底 " + base + "）——注意 provides 的键不能和现有键重名", "w");
+}
+
+/* ------------------------------------------------ 右栏 */
+function renderEntries() {
+  const box = $("entries");
+  $("entcount").textContent = S.project.entries.length;
+  if (!S.project.entries.length) { box.innerHTML = '<div class="hint">还没有条目</div>'; return; }
+  box.innerHTML = "";
+  S.project.entries.forEach((e, i) => {
+    const d = document.createElement("div");
+    d.className = "ent" + (i === S.activeIdx ? " on" : "");
+    const n = editCount(e);
+    d.innerHTML = '<span class="mode ' + (e.mode === "provide" ? "pv" : "ov") + '">' +
+      (e.mode === "provide" ? "新增" : "覆盖") + '</span>' +
+      '<span class="nm">' + esc(e.category) + "/" + esc(e.key) + '</span>' +
+      (e.sourceFile ? '<span class="tag">换文件</span>' : '') +
+      (n ? '<span class="ct">' + n + '改</span>' : '') +
+      '<button class="x danger">✕</button>';
+    d.onclick = (ev) => {
+      if (ev.target.tagName === "BUTTON") {
+        S.project.entries.splice(i, 1);
+        if (S.activeIdx >= S.project.entries.length) S.activeIdx = S.project.entries.length - 1;
+        log("移除条目 " + e.category + "/" + e.key, "o");
+        renderEntries(); renderKeys(); scheduleSave(); doPreview();
+        return;
+      }
+      activate(i);
+    };
+    box.appendChild(d);
+  });
+}
+
+async function renderPreview() {
+  const p = await api("/api/preview", { project: S.project });
+  const box = $("preview");
+  if (p.errors && p.errors.length) {
+    box.innerHTML = '<div class="v FAIL" style="font-family:var(--sans)">' +
+      p.errors.map(esc).join("<br>") + '</div>';
+    $("prevname").textContent = "渲染失败";
+    return;
+  }
+  const rels = Object.keys(p.files);
+  if (!rels.length) { box.innerHTML = '<div class="hint">还没有条目</div>'; return; }
+  let rel = S.activeRel && p.files[S.activeRel] ? S.activeRel : rels[0];
+  const info = p.files[rel];
+  $("prevname").textContent = rels.length + " 个文件";
+  let h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">';
+  for (const r of rels) {
+    h += '<button style="padding:2px 7px;font-size:11px;' +
+      (r === rel ? "background:var(--accent);border-color:var(--accent);color:#fff" : "") +
+      '" onclick="S.activeRel=\'' + r.replace(/'/g, "\\'") + '\';doPreview()">' +
+      esc(r.split("/").pop()) + '</button>';
+  }
+  h += '</div>';
+  h += '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px">' +
+       esc(rel) + '</div>';
+  h += info.binary ? '<div class="hint">二进制条目，' + info.size + ' 字节</div>'
+                   : '<pre>' + esc(info.text) + '</pre>';
+  if (p.warnings && p.warnings.length) {
+    h += '<div class="hint" style="text-align:left;color:var(--warn);padding:6px 2px">' +
+      p.warnings.map(esc).join("<br>") + '</div>';
+  }
+  h += '<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--dim);font-size:11px">mod.json</summary>' +
+       '<pre style="margin-top:5px">' + esc(JSON.stringify(p.manifest, null, 2)) + '</pre></details>';
+  box.innerHTML = h;
+}
+
+let _prevTimer = null;
+function doPreview() {
+  clearTimeout(_prevTimer);
+  _prevTimer = setTimeout(() => renderPreview().catch(e => log("!! 预览失败: " + e.message, "e")), 180);
+}
+let _saveTimer = null;
+function scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    try { await api("/api/project", { project: S.project }); }
+    catch (e) { log("!! 保存工程失败: " + e.message, "e"); }
+  }, 400);
+}
+function metaChanged() {
+  S.project.meta.name = $("m-name").value;
+  S.project.meta.id = $("m-id").value;
+  S.project.meta.version = $("m-version").value;
+  S.project.meta.author = $("m-author").value;
+  S.project.meta.description = $("m-desc").value;
+  scheduleSave(); doPreview();
+}
+
+/* ------------------------------------------------ 构建 / 安装 */
+async function build() {
+  const btn = $("btn-build");
+  btn.disabled = true; btn.textContent = "构建中…";
+  try {
+    log("开始构建…", "h");
+    const r = await api("/api/build", { project: S.project, install: true });
+    if (!r.ok) {
+      log("!! 构建失败：" + JSON.stringify(r.errors || r), "e");
+      renderValidation([{ level:"FAIL", code:r.stage || "build", msg:JSON.stringify(r.errors || r) }]);
+      return;
+    }
+    log("打包成功: " + r.pmod + "  (" + r.size + " 字节, " + r.entries.length + " 条目)", "g");
+    if (r.installed) log("已安装到: " + r.installed, "g");
+    else log("!! Mods 目录不存在，只生成了包，没安装", "w");
+    renderValidation(r.validation || []);
+    await refreshInstalled();
+    log("进游戏后：按 F3 → Mod 工具 → 启用 → 「应用已安装 Mod 到当前游戏」", "h");
+  } catch (e) {
+    log("!! 构建异常: " + e.message, "e");
+  } finally {
+    btn.disabled = false; btn.textContent = "构建并安装";
+  }
+}
+
+function renderValidation(items) {
+  const box = $("validation");
+  if (!items.length) { box.innerHTML = '<div class="hint">还没构建</div>'; $("vsum").textContent = ""; return; }
+  const bad = items.filter(i => i.level === "FAIL").length;
+  const warn = items.filter(i => i.level === "WARN").length;
+  $("vsum").textContent = "FAIL " + bad + " / WARN " + warn + " / 共 " + items.length;
+  box.innerHTML = "";
+  for (const it of items) {
+    if (it.level === "OK") continue;
+    const d = document.createElement("div");
+    d.className = "v " + it.level;
+    d.innerHTML = '<span class="c">' + esc(it.code) + '</span><span>' + esc(it.msg) + '</span>';
+    box.appendChild(d);
+  }
+  if (!box.children.length) box.innerHTML = '<div class="v OK">全部 ' + items.length + ' 项通过</div>';
+}
+
+async function refreshInstalled() {
+  const r = await api("/api/installed");
+  S.state.installed = r.installed || [];
+  renderInstalled();
+}
+function renderInstalled() {
+  const box = $("installed");
+  const list = S.state.installed || [];
+  $("instcount").textContent = list.length;
+  if (!list.length) { box.innerHTML = '<div class="hint">Mods 目录里还没有 .pmod</div>'; return; }
+  box.innerHTML = "";
+  for (const m of list) {
+    const d = document.createElement("div");
+    d.className = "v";
+    const mm = m.manifest || {};
+    d.innerHTML = '<span class="c">' + (m.size / 1024).toFixed(1) + 'K</span>' +
+      '<span style="flex:1">' + esc(mm.name || m.file) +
+      (mm.version ? ' <span style="color:var(--dim)">v' + esc(mm.version) + '</span>' : '') +
+      (mm.author ? ' <span style="color:var(--dim)">· ' + esc(mm.author) + '</span>' : '') +
+      '<br><span style="color:var(--dim);font-size:10px">' + esc(m.file) + ' · ' + esc(m.mtime) + '</span>' +
+      (m.error ? '<br><span style="color:var(--bad)">' + esc(m.error) + '</span>' : '') +
+      '</span><button class="danger" style="padding:1px 7px">卸载</button>';
+    d.querySelector("button").onclick = async () => {
+      if (!confirm("从 Mods 目录删除 " + m.file + "？")) return;
+      await api("/api/uninstall", { file: m.file });
+      log("已卸载 " + m.file, "w");
+      refreshInstalled();
+    };
+    box.appendChild(d);
+  }
+}
+
+async function reveal(target) {
+  const r = await api("/api/reveal", { target: target });
+  if (r.ok) log("已打开 " + r.path, "o"); else log("!! " + r.error, "e");
+}
+async function reindex() {
+  log("重建 uid 索引（第一次要几秒）…", "h");
+  const r = await api("/api/reindex", {});
+  log("索引完成：" + r.count + " 条 uid", "g");
+}
+
+document.addEventListener("keydown", ev => {
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); scheduleSave(); log("工程已保存", "g"); }
+});
+boot().catch(e => log("!! 启动失败: " + e.message, "e"));
+</script>
+</body>
+</html>

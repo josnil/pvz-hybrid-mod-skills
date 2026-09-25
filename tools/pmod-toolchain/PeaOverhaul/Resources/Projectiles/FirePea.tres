@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="TowerDefenseProjectileConfig" format=3]
+
+[ext_resource type="PackedScene" uid="uid://s48jlsqj8x0l" path="res://Asset/Config/Projectile/Pea/Sprite/FirePea/FirePea.tscn" id="1"]
+[ext_resource type="Script" uid="uid://bk3bi1tbywdrl" path="res://Resource/TowerDefense/Projectile/TowerDefenseProjectileConfig.cs" id="2"]
+[ext_resource type="PackedScene" uid="uid://bv4juwge7ravc" path="res://Prefab/Particles/Splats/FireSplats/FireSplats.tscn" id="3"]
+
+[resource]
+script = ExtResource("2")
+name = "FirePea"
+baseDamage = 120.0
+projectileScene = ExtResource("1")
+splatSceneType = "Sprite"
+splatAudio = "Ignite"
+splatScene = ExtResource("3")
+hitEffect = null
+hitBody = true
+useRange = true
+rangeSize = Vector2(0.5, 0.25)
+damageFlags = 7
+collisionFlags = 1
+catapultHeight = 400.0
+scale = Vector2(1.6, 1.6)
+penetrateNum = 8

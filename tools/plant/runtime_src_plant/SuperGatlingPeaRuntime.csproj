@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    「超级机枪射手」植物 Mod 的托管运行时程序集。
+
+    与 runtime_src（地图 Mod 那份）是**两个独立工程**：每个 .pmod 都必须自带一份
+    路径恰好为 Runtime/ModAssembly.dll 的程序集，且各自的 runtimeEntryType 不同，
+    所以刻意不共用 —— 这样地图那份已验证的产物字节不受影响。
+
+    同样刻意不用 Godot.NET.Sdk（要联网还原包 + 源码生成器）：本入口只用到
+    Godot 普通 API（Engine / SceneTree / Node / Time / RandomNumberGenerator）
+    和游戏程序集里的公开成员，不碰靠源码生成器产生的东西（SignalName / MethodName 等）。
+    `OnFireVolley` 是**游戏自己声明的 C# event**（FireComponent.cs:673），可以直接 += / -=。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>ModAssembly</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <!--
+      注意：两台机/两处拷贝的目录名不同（实测）：
+        D:\zzz\植物大战僵尸杂交版0.28.1\植物大战僵尸杂交重制版\data_...
+        D:\zzz\植物大战僵尸杂交重制版\data_...
+      下面这条是**当前实测存在**的那份；若换机器请用 -p:GodotRefDir=... 覆盖。
+    -->
+    <GodotRefDir Condition="'$(GodotRefDir)' == ''">D:\zzz\植物大战僵尸杂交重制版\data_PlantsVsZombies_windows_x86_64</GodotRefDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      离线校验脚本（check_*.cs 这类「文件级应用」带顶级语句）不能被当库成员编译，
+      否则 CS8805「使用顶级语句的程序必须是可执行文件」。
+    -->
+    <Compile Remove="check_*.cs" />
+    <None Include="check_*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      植物 / 僵尸**共用**同一份「射击判定核心」源文件（单一真源）：
+      runtime_shared/GatlingVolleyCore.cs。Link 让它以虚拟文件名出现在工程里。
+    -->
+    <Compile Include="..\runtime_shared\GatlingVolleyCore.cs" Link="GatlingVolleyCore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Private=false：26MB 的游戏程序集不进输出，运行时由引擎自己那份解析 -->
+    <Reference Include="GodotSharp">
+      <HintPath>$(GodotRefDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PlantsVsZombies">
+      <HintPath>$(GodotRefDir)\PlantsVsZombies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

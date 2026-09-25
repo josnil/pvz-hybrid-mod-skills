@@ -12,5 +12,6 @@ Desktop.ini
 __pycache__/
 *.pyc
 
-# Repo scaffolding
-_setup_copy_skills.py
+# Repo scaffolding (one-off sync/inventory scripts)
+_*.py
+_*.log

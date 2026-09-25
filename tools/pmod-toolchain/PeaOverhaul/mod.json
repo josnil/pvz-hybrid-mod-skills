@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "id": "peaoverhaul",
+  "name": "豌豆强化",
+  "version": "1.0.0",
+  "author": "云漫行",
+  "description": "演示用 Mod：放大豌豆类子弹并提升伤害与穿透（覆盖 Projectile 资源）",
+  "dependencies": [],
+  "conflicts": [],
+  "provides": {},
+  "overrides": {
+    "Projectile": [
+      "PeaDefault",
+      "SnowPea",
+      "FirePea",
+      "GoldPea"
+    ]
+  },
+  "scripts": [],
+  "runtimeAssembly": "",
+  "runtimeEntryType": "",
+  "runtimeApiVersion": 0,
+  "runtimeAssemblyPolicy": "",
+  "blueprints": [],
+  "translations": [],
+  "resources": [
+    "Resources/Projectiles/PeaDefault.tres",
+    "Resources/Projectiles/SnowPea.tres",
+    "Resources/Projectiles/FirePea.tres",
+    "Resources/Projectiles/GoldPea.tres"
+  ]
+}

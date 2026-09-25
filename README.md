@@ -5,7 +5,7 @@
 [![Game](https://img.shields.io/badge/game-PvZ%20Hybrid%20V0.28%20(Godot%204%20%2B%20C%23)-orange)]()
 
 > 🤖 **本技能包在 [WorkBuddy](https://www.workbuddy.cn) 中使用。**
-> **新用户邀请链接：** <https://www.workbuddy.cn/events/invite?inviteCode=2x5jma1axhe8>
+> **新用户邀请链接：** <https://www.workbuddy.cn/events/invite?inviteCode=ryoc35nu7pi1nq>
 > 该链接是 WorkBuddy AI Agent 工作台的**新用户邀请注册入口**——WorkBuddy 是承载并驱动这三个技能的 AI 助手环境（对话式 Mod 制作、技能自动加载、自动化闸门执行），通过链接注册后即可在 WorkBuddy 中直接安装并使用本仓库的技能。
 
 一套面向《植物大战僵尸杂交版》（Godot 4 + C#）Mod 开发的 **WorkBuddy Agent Skills（AI 技能包）**，由三个互相衔接的技能组成：一个覆盖 `.pmod` 包格式的通用底座，加上植物、僵尸两条端到端的专用流水线。全部内容来自真实项目的反复实测——每条"铁律"都对应一次踩坑，每个坑都附了根因与源码级证据。
@@ -37,7 +37,7 @@
 
 三个技能把"从一句需求到装机可玩"的全过程拆成了可被 AI 精确执行的操作手册：
 
-- **为什么是知识文档而不是一堆脚本？** 技能包交付的是经过验证的**方法论与硬约束**（包格式、字段语义、发射链路、渲染管线、离线闸门设计），配合你自己的生成器脚本使用。技能中引用的生成器/闸门脚本属于作者的工作区，请按文档指引自行搭建等价物。
+- **知识文档 + 可复用工具的组合**：技能交付的是经过验证的**方法论与硬约束**（包格式、字段语义、发射链路、渲染管线、离线闸门设计）；技能所引用的生成器、闸门脚本与图形编辑器已在 [`tools/`](tools/README.md) 随仓库发布，可直接复用或照抄改造。
 - **为什么值得信？** 每条结论都以引擎源码（`addons/ModEditor/ModSystem/`、`Script/Component/`）为最终判据，并配有"负向测试"验证闸门本身不是假绿。
 
 ## 三个技能总览
@@ -57,7 +57,7 @@ pvz-hybrid-mod-skills/
 ├── README.md                       # 本文档（中文）
 ├── README_EN.md                    # 英文文档
 ├── LICENSE                         # MIT
-└── skills/                         # 三个技能模块，每个文件夹即一个可独立安装的技能
+├── skills/                         # 三个技能模块，每个文件夹即一个可独立安装的技能
     ├── pvz-hybrid-mod-authoring/
     │   └── SKILL.md                # 技能主文档（含全部铁律与包格式细节）
     ├── pvz-hybrid-plant-authoring/
@@ -78,6 +78,13 @@ pvz-hybrid-mod-skills/
             ├── zombie-package-and-gates.md  # 13 文件包结构 / 护具 / 卡库
             ├── zombie-fire-and-marker.md    # 发射体系 / 子弹生成点对齐炮口
             └── zombie-skin-and-head.md      # 换外观 / 三节点换头 / 头对位量化
+└── tools/                          # 配套工具链与样板生成器（详见 tools/README.md）
+    ├── pmod-toolchain/             # .pmod 构建/校验/热补丁 + 图形编辑器 + 纯资源样板工程
+    ├── plant/                      # 植物流水线样板生成器 + 托管插件源码 + 离线闸门
+    ├── zombie/                     # 僵尸样板 ×3 + 共享源 + 闸门 + 头位量化工具
+    ├── map/                        # 地图流水线样板 + 闸门
+    ├── skin/                       # 经典 reanim → .dat/.tres/图集 直转管线
+    └── case-docs/                  # 五份成套案例交付文档
 ```
 
 ## 安装与配置
@@ -173,7 +180,7 @@ pvz-hybrid-mod-skills/
 
 | 依赖 | 用途 | 说明 |
 |---|---|---|
-| **WorkBuddy**（推荐） | 技能的运行载体 | 通过[邀请链接](https://www.workbuddy.cn/events/invite?inviteCode=2x5jma1axhe8)注册；不用 WorkBuddy 也可当文档读 |
+| **WorkBuddy**（推荐） | 技能的运行载体 | 通过[邀请链接](https://www.workbuddy.cn/events/invite?inviteCode=ryoc35nu7pi1nq)注册；不用 WorkBuddy 也可当文档读 |
 | **《植物大战僵尸杂交版》V0.28 解包** | 事实判据来源 | 技能需要读 `addons/ModEditor/ModSystem/` 下的引擎源码（`ModLoader.cs`、`XWModManifest.cs` 等）与 `Asset/` 资源结构 |
 | **Python ≥ 3.13** | 生成器 / 闸门 / 校验脚本 | 纯数学脚本零第三方依赖 |
 | **Pillow (PIL)** | 外观直转、抠像、离线渲染、对照图 | `pip install pillow` |
@@ -186,9 +193,11 @@ pvz-hybrid-mod-skills/
 | **Node.js（可选）** | 个别工具脚本 |
 | **经典版 PvZ 素材（reanim）** | 走"官方素材直转"换外观路线时（技能描述了 reanim → `.dat`/`.tres`/图集 的转换流程，转换脚本需自行搭建） |
 
-### 技能包内不含的东西（如实说明）
+### 配套工具与样板（tools/）
 
-本仓库交付的是**知识文档（Agent Skills）**，不含可执行脚本。技能中引用的作者工作区工具（如 `build_plant_super_gatling.py` 生成器、`mod_editor.py` 图形编辑器、各类闸门脚本）没有随包发布；按文档描述的规格自行实现等价脚本即可，规格本身是完整的（字段、字节布局、判据、负向用例都在文档里）。
+技能所引用的工具**已随仓库发布**，详见 [tools/README.md](tools/README.md)：`.pmod` 工具链（`build_pmod.py` / `verify_pmod.py` / 数值热补丁 / 图形编辑器 `mod_editor.py`）、四条流水线的样板生成器与托管 C# 插件源码、离线闸门与头位量化脚本、官方素材直转管线（reanim → `.dat`/`.tres`/图集）、五份成套案例交付文档。
+
+⚠️ 这些脚本来自作者的 Windows 环境，**部分路径写死**（解包目录、两份游戏构建），使用前请按 `tools/README.md` 的「环境适配」一节替换为自己的路径；版本基准 V0.28，引擎更新后以 `addons/ModEditor/ModSystem/` 源码为最终判据。
 
 ## 标准工作流（三技能如何配合）
 

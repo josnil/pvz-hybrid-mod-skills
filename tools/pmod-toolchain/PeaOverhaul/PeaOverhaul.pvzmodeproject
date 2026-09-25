@@ -1,0 +1,10 @@
+{
+  "Name": "PeaOverhaul",
+  "Version": "1.0.0",
+  "Author": "云漫行",
+  "Description": "演示用 Mod：放大豌豆类子弹并提升伤害与穿透（覆盖 Projectile 资源）",
+  "ExportDirectory": "C:/Users/yanxulin002/AppData/Roaming/Godot/app_userdata/植物大战僵尸杂交版/Mods/",
+  "GameDirectory": "",
+  "CreatedDate": "2026-09-15T20:55:38.791097+08:00",
+  "LastModifiedDate": "2026-09-15T20:55:38.791097+08:00"
+}

@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    「暴走舞王伽刚特尔投石车僵尸」僵尸 Mod 的托管运行时程序集。
+
+    与 runtime_src（地图）、runtime_src_plant（植物）是**三个独立工程**：每个 .pmod 都必须自带
+    一份路径恰好为 Runtime/ModAssembly.dll 的程序集，且各自的 runtimeEntryType 不同，
+    所以刻意不共用 —— 这样前两份已验证的产物字节不受影响。
+
+    同样刻意不用 Godot.NET.Sdk（要联网还原包 + 源码生成器）：本入口只用到
+    Godot 普通 API（Engine / SceneTree / Node / Tween / Callable / GD / Time）
+    和游戏程序集里的公开成员，不碰靠源码生成器产生的东西（SignalName / MethodName 等）。
+    `OnFireEvent` 是**游戏自己声明的 C# event**（CatapultComponent.cs:139），可以直接 += / -=；
+    `child_entered_tree` 是 Godot 内置信号，走 Connect("child_entered_tree", Callable)。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>ModAssembly</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <GodotRefDir Condition="'$(GodotRefDir)' == ''">D:\zzz\植物大战僵尸杂交版0.28\植物大战僵尸杂交重制版\data_PlantsVsZombies_windows_x86_64</GodotRefDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      离线校验脚本（check_*.cs 这类「文件级应用」带顶级语句）不能被当库成员编译，
+      否则 CS8805「使用顶级语句的程序必须是可执行文件」。
+    -->
+    <Compile Remove="check_*.cs" />
+    <None Include="check_*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Private=false：26MB 的游戏程序集不进输出，运行时由引擎自己那份解析 -->
+    <Reference Include="GodotSharp">
+      <HintPath>$(GodotRefDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PlantsVsZombies">
+      <HintPath>$(GodotRefDir)\PlantsVsZombies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
