@@ -15,3 +15,8 @@ __pycache__/
 # Repo scaffolding (one-off sync/inventory scripts)
 _*.py
 _*.log
+
+# Build artifacts (NaiLong and future runtime sources)
+**/obj/
+**/.build/
+.cache_nailong/
