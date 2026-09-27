@@ -2100,3 +2100,217 @@ spawn(BROWSER, ['--headless=new','--disable-gpu','--no-first-run','--no-default-
   `verify_pmod.py`（离线 22 项）· `.cache/test_api2.py`（接口 133 项）·
   `.cache/verify_ui.js`（真机合成点击 51 项）· `.cache/verify_search_flow.js`（真鼠标 ×10 视口 70 项）
 
+## ★ 托管代码 Mod 的交付链必查项：DLL 有没有真的进包（2026-09-26 实测踩坑）
+
+`dotnet build` 产物在 `runtime_src/bin/Release/ModAssembly.dll`，而打包脚本读的是
+`Runtime/ModAssembly.dll`——**改了代码忘记拷这一步，会打出一个「新 mod.json + 旧 DLL」的包**，
+装机后功能毫无变化（表现和"没装机"一模一样，极易误判为逻辑 bug）。
+
+- 打包器里加**护栏0**：对比两个文件的 md5，不一致就自动用编译产物覆盖（并打印 md5）；
+- **装机后必须核对**：`unzip -p 包.pmod Runtime/ModAssembly.dll | md5sum` == 编译产物 md5，
+  这是唯一能证明"新代码真的进包了"的证据；
+- 判断编译完成只看 `bin/Release/ModAssembly.dll` 的时间戳 + 日志「已用时间」，不看任务状态。
+
+## ★ 覆盖 `Prefab/` 下的 UI 场景（.tscn）——资源通道走不通，只能运行时注入（2026-09-26 实测）
+
+想给 `Prefab/GUI/DialogBox/BattleOption/BattleOption.tscn` 这类 UI 场景加控件（如设置页加 CheckBox）：
+
+- **`.pmod` 资源管线覆盖不了**：`InferRuntimeEntry` 扩展名硬限 `.tres`/`.res`，且 category 全表里
+  **没有任何类别对应 `Prefab/` 前缀**——往包里塞 .tscn 只会变成死文件。
+- **唯一可行路 = 托管插件运行时注入**：扫描场景树找到目标对话框根节点（如 `BattleOption`），
+  动态 `AddChild` 新控件，信号的 `Connect` 也由插件自己接管
+  （游戏脚本在 pck 里是 1 字节占位，只处理它自己认识的节点，光塞节点没人响应）。
+- 节点状态持久化用 `user://xxx.cfg`（`Godot.ConfigFile`）；对话框每次打开重新实例化，
+  注入代码必须幂等（按节点名查，已存在只校准状态）。
+
+**Godot 4 C# 枚举命名坑（CS0117 实测）**：枚举名不是全加 `Enum` 后缀——
+`Control.MouseFilterEnum`（与属性 `MouseFilter` 撞名才加），但 `Control.CursorShape`
+（属性叫 `MouseDefaultCursorShape`，不撞名**不加后缀**）。拿不准就先按属性名反推。
+
+## ★ CharacterTimerComponent 的三个字段是「字典」不是标量（2026-09-26 探针定案）
+
+`CharacterTimerComponent`（InstanceId `character.timer`）：
+- `timerRunning` = `Dictionary<string, bool>`
+- `timerWaitTime` = `Dictionary<string, double>`
+- `timerCurrent` = `Dictionary<string, double>`
+
+按**计时器名分项**：TimeBomb 有 `"Countdown"` + `"Ready"` 两项、CraterG 有 `"Spawn"`、
+PeaWell 有 `"Fire"`、KelpMine 有 `"Armed"`……（键名来自各 `*TimerComponentDefinition.tres`）。
+读"正在倒计时" = 遍历 `timerRunning` 找值为 true 的键，剩余取 `waitTime[key] - current[key]`。
+**按标量读**（`value is bool` / `Convert.ToDouble(value)`）会**永远不命中且不报错**——
+这是"组件取得到、就是不显示"类 bug 的隐蔽根因，排查时先把值 `ToString()` 打出来看类型。
+
+## ★ 两条"角色级字段"与"运行时改 UI 树"的实战结论（2026-09-26 实测）
+
+**坑洞消失倒计时**不在组件里，在**角色类字段**上：`TowerDefenseCrater`（全部坑洞的基类）
+`dieDownTimer:double` 递减、归零调 `DieDown()`；总时长在配置 `TowerDefenseCraterConfig.dieDownTime`
+（DayGround=200s、NG=30s——各变体不同，必须读运行时）。坑洞**可能没有组件集**，
+所以这类判断要放在 `componentManager==null` 早退**之前**；用"沿类型链反射找字段名"
+做判据（加 `Dictionary<Type,FieldInfo>` 缓存），不要写死角色名单。
+
+**运行时 reparent 游戏 UI 树是安全的，前提是先查元数据**：给 `BattleOption` 设置页
+加"两列布局"（新建 HBox 包住原 VBox + 新列）——风险在于脚本是否按路径引用节点。
+`mdprobe` 查得 `BattleOption.plantHealthCheckBox : CheckBox` 等是**对象引用字段**
+（_Ready 里赋值一次），reparent 不影响；且注入发生在 _Ready 之后。
+教训：**动游戏场景树之前，先用 mdprobe 看脚本持有什么（对象引用 vs NodePath）**。
+
+**mdprobe 升级**：已支持字段类型输出（`fd.DecodeSignature(ISignatureTypeProvider)`），
+TFM=net9，用法 `./mdprobe.exe <dll> <类型名关键词>`。找"运行时数值在哪个字段"全靠它。
+
+**大嘴花咀嚼 = `ChomperComponent`**（InstanceId 统一 `character.chomper`，8 个定义共用；
+普通/僵尸/蒜香/花盆/尖刺/爆破/僵尸鲨鱼/ChomperZ 都挂它——判据用组件存在）：
+`isChew:bool` 为 true 期间，剩余 = **`chewTime − chewTimer`**。
+⚠️ **`currentChewTime` 恒等于 `chewTime`**（"本轮咀嚼时长"快照，不是进度）——用它算剩余会恒为 0
+（v1.5.0 实测踩坑）。实测 chewTime：普通大嘴花 40s、僵尸大嘴花 30s、大嘴花僵尸 10s。
+
+**"快照字段 vs 进度字段"是数值类字段的第三类坑**（同族：字典字段、方向相反的计时字段）：
+一个组件里往往同时存在"配置快照"（恒定的总时长）与"进度"（递增/递减的 Timer），
+名字都带 Time —— 靠"候选字段全打日志 + 与配置总时长对照"一次定案，不要凭名字猜。
+
+**"Godot 数组不是 System.Array"是第四类坑（2026-09-26 实测，三次定案合订）**：导出字段
+`growUpTime` 的真实类型是 **`Godot.Collections.Array<float>`**（mdprobe 类型输出显示为
+Array+反引号+1+`<Single>` 的泛型反射名；若是 .NET 数组会显示 <code>Single[]</code>）。三层陷阱：
+1. `is System.Array` **恒 false**；`is System.Collections.IList` 也别指望（泛型容器不一定
+   实现非泛型接口）。
+2. ★★ **`Godot.Collections.Array<T>` 的基类是 `Object`——与非泛型 `Godot.Collections.Array`
+   没有继承关系**（GodotSharp 元数据实锤：`TYPE Godot.Collections.Array`1 : Object`）！
+   所以 `as Godot.Collections.Array` **恒 null**（v1.7.1~1.7.4 连踩四版）。
+3. 正确读法（照抄）：**`as Godot.Collections.Array<float>`（精确泛型匹配，索引器返回 T）
+   → `as IList<float>` → `as IEnumerable` 逐元素（装箱 float / Variant 双兼容）**。
+   编译期就要用它原生类型：`Godot.Collections.Array<Node> kids = node.GetChildren();` 这种
+   直接类型引用一直是对的（GetChildren 原生返回该类型）。
+   **判据：mdprobe 输出里看到 Array+反引号+数字（如 Array`1）就是泛型容器，别名一定带 `<T>`。**
+
+**第五类坑：组件字段为"空容器"、真实数据在 Definition 资源上（2026-09-26 实测）**：
+`GrowUpComponent.growUpTime` 运行时 **Count=0**（timer 在跑、reach 正常，就是数组空）——
+数据在 `GrowUpComponentDefinition.growUpTime`（组件的 Definition 属性指向的定义资源）。
+**访问器的属性名是基类 `CharacterComponentRuntime.ComponentDefinition`**
+（不是 `Definition`！GrowUp/Produce 等组件自己**没有** Definition 属性，只有个别组件
+（如 ChomperComponent）多一个 `Definition` 别名 ⇒ **先mdprobe查该组件的 P 列表再写代码**）。
+读取顺序：**组件字段（非空）→ 组件.ComponentDefinition（失败退查 .Definition）的同名属性/
+backing field → 兜底通道**；诊断日志带"数据源 + 每步失败原因"。遇到"容器是空但其他字段
+正常"优先怀疑这一点。
+
+**第六类坑：`BindingFlags.Static` 缺失——静态配置字段静默找不到（2026-09-26 实测）**：
+`TowerDefensePlantEnergyBean` 的 `ChargeInterval`/`MaxChargeLevel`/`ReleaseDuration` 等是
+**static 字段**（类级常量式的配置），而 `_chargeLevel`/`_chargeTimer`/`_produce` 是实例字段——
+用只带 `Instance` 的反射查找会在**同类型里**出现"一半字段找到、一半恒 null（不报错）"的怪象。
+修法：字段查找一律 `BindingFlags.Instance | BindingFlags.Static | Public | NonPublic | DeclaredOnly`；
+static 字段的 `GetValue(obj)` 自动忽略实例参数，无需分支。
+**命名与 static 无关**（`staticTime` 反而是实例字段）——**不要按名字猜，给元数据工具加
+`[static]` 标记（mdprobe 已支持）或用离线反射探针实测**。同类侦察法：`ProduceComponent`
+的 `SunType`/`CoinType`/`PacketType` 全是 static 常量——若拿它们做判定同样会静默失败。
+
+**第七类坑：组件有两个独立体系——在错的集合里找组件=永远找不到（2026-09-27 实测）**：
+- `ComponentManager.componentList : List<ComponentBase>` —— **ComponentBase 体系**（定义/包装）；
+- `ComponentManager._runtimeByInstanceId : Dictionary<string, CharacterComponentRuntime>` ——
+  **运行时组件体系**（`FireComponent`/`AttackComponent`/`CannonComponent`/`ChomperComponent`/
+  `TanglekelpComponent`… 全部派生自 `CharacterComponentRuntime`）。
+**在 componentList 里 `is FireComponent` 恒 false（静默）**——症状："诊断显示该角色 Fire=False"。
+取运行时组件的两种正确姿势：① `cm.GetRuntime<T>("character.fire")`（需知道 InstanceId，
+注意有些带后缀如 `character.attack.0`）；② **遍历 `_runtimeByInstanceId.Values` 按类型匹配**
+（不依赖 InstanceId，推荐）。日常排查用一次 `倍率探测[名]：Fire=.. Attack=..` 这类探针即定案。
+
+**第八类坑：msbuild 偶发"卡在退出/复制"——产物其实已生成（2026-09-27 实测，当天踩 3 次）**：
+症状：`dotnet build` 前台被 SIGTERM（超时）、后台卡 8 分钟无输出——但 **`obj/Release/ModAssembly.dll`
+往往已是本次新产物**。**处置流程**：
+1. 先看日志**有没有 `error CS`**（有错则 obj 是旧的、不能救；必须先修代码）；
+2. 看 `obj/Release/ModAssembly.dll` **时间戳是否 ≥ 本次编译开始时间**（是=产物 OK）；
+3. **手动同步**：`cp -f obj/Release/ModAssembly.dll bin/Release/ModAssembly.dll`（核对 md5 一致）；
+4. 直接跑打包脚本（打包脚本的"护栏"会再核对 bin 与包内 DLL 一致）。
+**排查提示**：无进程残留、游戏没开锁时也可能复现——不是文件占用，就是 msbuild 退出阶段的偶发卡死。
+
+**运行时字段速查（本 Mod 项目沉淀，可直接复用）**：
+- **血量真身（★2026-09-27 深挖定案）**：**`HurtComponent._damageInstance`**（类型
+  `TowerDefenseCharacterInstance` 的实例）的 **`hitpoints`（当前血量）/ `hitpointsBase`（上限）**
+  ——**任何时刻可读、与血条显示无关**（障碍物/植物/僵尸通用，HurtComponent 经运行时注册表可取）。
+  ⚠️ `ShowHealthComponent` 的 `_bodyLabelState`/`_bodyDisplayText`/`bodyHitpointLabel` **平时全空**
+  （数据推给 UI 即走、不驻留——**不要用它们读血量**；`UpdateBodyLabel/3` 是外部推入口）；
+- `FireComponent`：`fireIntervalBase/fireInterval/timeScale/timer/fireNum/currentFireNum`；
+- `AdobeAnimateSprite._timeScale` = 动画播放速度（**猫窝对猫尾草类的"攻速翻倍"就落在这里：1→5/6**）；
+- `TowerDefenseInGamePacketShow`（选卡栏卡片）：`coldDown/coldDownTimer（=剩余）/_coldDownOpen`；
+- `TowerDefensePlantConfig.physiqueTypeFlags` **含 256 = "猫尾草类"**（豌豆猫/猫尾草/卷心菜尾等 17 种，
+  猫窝攻速翻倍的对象）；
+- 障碍物（坑洞/墓碑/炸弹核弹/大火）：类型名 `Crater` / `Gravestone`（含 `TimeBomb`/`TimeNuke`）/
+  `ItemMegaFire`；其角色级计时器（`Spawn=3`、`Countdown=60/120`、`Ready=1.5`）；
+  **TimeBomb/TimeNuke 另有角色类字段**：`countdownTime`/`readyDuration`/`_timerComponent`/`_exploded`。
+
+**数值方向最后核对法**：`Duration/Timer` 类字段先别猜方向——给"首次遇到"打一条
+`字段原始值 vs 配置总时长` 的日志，**看首采值贴近哪一端**：
+- 首采 ≈ 0 → 它是"已过"（从 0 递增），剩余 = 总时长 − 值；
+- 首采 ≈ 总时长 → 它是"剩余"（从满值递减），直接用它。
+实测样本：dieDownTimer/chewTimer/growUp.timer/Periodic.timer/produce.timer 是"已过"；
+**breakDownTimer（磁力消化）是"剩余"**——同为 Timer 命名，方向相反，必须逐一核对。
+本项目三次踩坑（字典、dieDownTimer 方向、breakDownTimer 方向）都是靠这条日志一次定案。
+
+**多行显示了怎么办（同一角色多个数值 / 同格多角色）**：不要"命中即独占返回"——
+把每个数值**追加**到 `List<(string text, Color color)>`；每行配**独立 Label**
+（`ModLine{i}`）而不是拼成一个多行字符串，否则各行的颜色无法不同、位置难控。
+**同格叠种**（阳光豆叠阳光菇）：按全局位置量化网格（8px）记"本帧该槽已占用高度"，
+后渲染的角色整组行向上错开；字典每帧 Clear、顺序按场景树遍历序则稳定。
+
+---
+
+## 托管代码 Mod 实战坑点（第九~十二类 + 工作流铁律，2026-09-27 HealthCooldownLine 全程沉淀）
+
+**第九类坑：注入游戏 UI（设置页）的四个小坑**：
+1. **插入代码块前先确认"锚点所在的方法"**——用 `}\n\n/// <summary>` 这种锚极易匹配到别的方法
+   （实测把一段 90 行的显示逻辑插进了 `FindFieldAlong` 的 `return null;` 之后 → **19 个编译错误**）。
+   插入前先 grep 锚点上下文、插入后立刻编译验证。
+2. **方法内局部常量（如 `const BindingFlags F = ...`）**只在该方法内可见——在别的方法里用会
+   `CS0103 当前上下文中不存在名称"F"`。跨方法一律写全名
+   `System.Reflection.BindingFlags.Instance | Public | NonPublic`。
+3. **设置页列布局受"对话框高度"硬限制**：列内容超高会**静默裁掉末行**（实测第三列 5 行只显示 4 行）。
+   手段：压缩 `separation`（10→6）、缩小字号，或分列（**三列**：第 1 列=游戏原生列表+总开关、
+   第 2/3 列=功能开关各 5 个）。**列内容按"显示顺序表"（int[] order）排**——功能索引不变、只调位次，
+   这样"互换两个开关位置"只需改数组。
+4. **选卡栏卡片上的自绘 Label**：卡片类 `TowerDefenseInGamePacketShow` 是 Control——
+   `lbl.Position = card.Size/2 - new Vector2(30,12)` 居中；`_coldDownOpen` 标记不可信
+   （实测 False 时其实在冷却），**判定用 `coldDownTimer > 0`（它本身就是剩余）**。
+
+**第十类坑：识别判定——"名单制 + 广义兜底"双轨，且警惕天生差异**：
+- **名单制**：用**数据字段**而不是名字直觉定名单。实例：**`physiqueTypeFlags & 256 = "猫尾草类"`**
+  （全库 17 种：豌豆猫/猫尾草/僵尸猫尾草/卷心菜尾/招财猫/热冬瓜猫…——**豌豆猫在内，此前的
+  "名字猜"判断是错的**）。加农炮族双格 = 类名含 `CobCannon`（精确片段，避开 PumpkinCannon）。
+- **广义兜底**：名单会漏（垃圾桶等障碍物不在 5 类名单里）——加**广义判定**：
+  "非 Plant/非 Zombie/非 Mower + 有 `HurtComponent`（有血量）"= 障碍物。**名单用于定向、广义用于补漏**。
+- **"全角色监控"会引入天生差异误报**：动画 `_timeScale` 不是恒 1（各角色基准速度天生不同）——
+  全角色监控把僵尸的基础速度当成了"加速"。**对策：白名单（只对类型判定命中的角色启用）
+  或基线对比（首次值 vs 当前值）**。
+- **"天生差异"与"真实加成"必须分开**：FeverStar 的 `当前间隔(2) > 基准(1.5)` 是天生慢、不是加成；
+  真正要显示的是**相对种下基线的变化**或**标称/实际的比值（只显示"变快"）**。
+
+**第十一类坑：加成/加速的"落点"没有统一位置——用探针一次性定位**：
+同一款游戏的"加速"可能落在**四个不同的地方**，靠猜必错：
+| 落点 | 实例 | 读法 |
+|---|---|---|
+| buff 的 `timeScaleValue` | 咖啡三叶草/蓄能咖啡豆 | 读 `_buffDictionary` 各 buff 的 timeScaleValue |
+| **动画 `AdobeAnimateSprite._timeScale`** | **猫窝**（1→5/6，"攻速翻倍"） | 动画精灵字段，**攻击由动画事件驱动** |
+| 发射/攻击字段（间隔/弹数/伤害） | 杨桃系（弹数 1→2） | 基线对比（fireNum/damageScale） |
+| **无量化（读不到）** | 毁灭咖啡豆（buff 无倍率字段） | 只显示"加成存在 + 剩余时长"兜底 |
+**做法**：写"全字段探针"——对目标角色**并列监控 5~6 个候选字段**（fireInterval/fireIntervalBase/
+fireComponent.timeScale/attackInterval/动画_timeScale/弹数），**任一变化即打日志**（含前后值）；
+一次实测就能定案（"猫窝探针[名] 变化：…动画ts 1→6" 就是这么来的）。
+**注意探针归属**：`FindSpriteOf` 递归找动画精灵时**必须限制深度**（3 层）——否则"壳+内容"结构
+（猫窝包裹植物）会把**里面植物**的精灵当成壳的（实测同一植物出现**两行相同数值**）。
+
+**第十二类坑：诊断信息量要一次给足，但输出最终要可关**：
+- **探针设计**：每个新功能配"每角色一次"的诊断行（首次遇到就打），含**全部原始值**
+  （如 `state=0/0 init=False label="..." text="" → 采用="..."`）——**一次看清卡在哪一步**，
+  避免"改一版问一次"的拉锯（本项目血量排查靠一版"三路全量诊断"直接定案）。
+- **日志总开关**：诊断调用（本项目 46 处 `Info`）用**常量开关**统一管理
+  （`EnableInfoLog = false` 时 `Info` 直接 return）——交付时一行关闭、调试时一行打开，
+  **不要逐个注释**。`Warn`（异常报告）保留单独通道。
+
+**工作流铁律（本项目的稳定做法）**：
+1. **批量文本改动用 python 脚本 + 断言命中数**：`assert s.count(old) == n`——
+   未命中立即失败退出，绝不静默继续（本项目十余次重映射/穿插改造全用此法；
+   替换顺序讲究：多编号映射**从大编号往小改**，避免链式误伤）。
+2. **先诊断、后修复**——日志/探针驱动；**绝不靠名字或直觉猜**（"猫尾草类"事件教训：
+   先按数据字段查，再动代码）。
+3. **改 UI 后必须目视验证**（截图/实测）——列裁剪、行数、字色这类问题肉眼才能发现。
+4. **"卡退出"处置**（第八类坑补充）：`obj/Release/ModAssembly.dll` **时间戳 ≥ 本次编译开始**
+   即产物可用 → `cp -f obj → bin` → 直接打包（打包护栏会再核对三方 md5）。
+5. **每次改动向用户汇报时**：版本号 + 三方 md5 一致（bin/包内/装机）+ 缓存清理 + 一条可验证的
+   操作指引（"重启后种 XX 看 YY"）——用户逐条核对，含糊的汇报会被打回。
+
