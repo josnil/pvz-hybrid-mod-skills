@@ -57,27 +57,6 @@ agent_created: true
 **两份游戏构建各跑一遍**）、`.cache/check_idempotent_*.py`（3 连跑字节稳定 + 增量清理 + 镜像一致），
 以及一个只读收尾核对脚本（`.cache/final_report_*.py`）。
 
-## ★ 交付给用户时的「工作目录 zip」格式（2026-09-28 用户指定）
-
-> 用户说「打包到桌面」时，**要的是把整个 Mod 工程目录 + 技能仓库目录一起压成一个 zip**，
-> 不是只给 `.pmod`，也不是自创 `01_成品/02_源码/03_技能记录/` 分类目录（该做法已被明确否掉）。
-
-参照样本：`C:\Users\txgcs\Downloads\杂交版Mod制作-打包-20260927-v2.zip`
-
-### 顶层结构（每个 Mod 一个目录，平铺）
-
-```
-<ModName>/                        <- 完整工程目录，原样打入（不要拆分类）
-    README.md                     <- 该 Mod 的交付文档（含需求映射/硬约束/已知副作用/未验证项）
-    mod.json
-    build_pmod.py                 <- 构建+打包+安装脚本
-    runtime_src/                  <- 托管代码源码（.cs / .csproj）
-    Runtime/ModAssembly.dll       <- 编译产物
-    build*.log                    <- 历次构建日志（保留，便于追溯）
-    dist/<ModName>.pmod           <- ★ 成品 pmod 放工程内 dist/ 子目录
-pvz-hybrid-mod-skills-main/       <- 技能仓库完整目录（skills/ + tools/ + README）
-```
-
 ### 打法要点
 - **源码 = 工程目录自身**（`runtime_src/` 下），不要再另建 `02_源码/`。
 - **技能记录 = 技能仓库目录自身**（`skills/*/SKILL.md`），不要再另建 `03_技能记录/`。

@@ -207,6 +207,125 @@ public bool forceCpuPoseRender { … }     // :1166
 （`BindingFlags.Instance | NonPublic`），拿不到就退化成「不刷新」（最坏：用户翻一次分类），
 **绝不硬调 `InitPlant()`**。
 
+### 3.6 ★★ 让 A 卡的**卡面**长出 B 植物的外观（皮肤/背景/阳光/冷却/价格）
+
+场景：模仿者类 Mod —— 一张卡（`config.saveKey` 恒为 `MyKey`）要**显示成**被模仿植物的样子。
+
+**做法：卡面精灵换 + `_override` 覆盖层 + 逐帧数值同步**，三件事各自独立：
+
+| 要跟的东西 | 旋钮 | 关键点 |
+|---|---|---|
+| 预览图 | 临时把 `ResourceManager.CHARCTAER_SPRITE[MyKey]` 指向目标场景，**在替换窗口内**调 `card.Init(cfg)` / `card.CreateSprite()`，随后 `finally` 还原字典 | `CreateSprite()` 是**同步**的，读 `CHARCTAER_SPRITE[config.saveKey]`；必须放在窗口**内** ⇒ 否则精灵被按自己重建（费用换了、图还是旧精灵） |
+| 背景 / 阳光 / 「+」号 / 冷却 | `cfg._override`（`TowerDefensePacketOverride`） | `_GetType()`→`_override.type`；`GetCost()`→`_override.cost`；`GetCostRise()`→`_override.costRise`（**`-1` 才不显示「+」**）；`GetPacketCooldown()/GetStartingCooldown()`→`_override.packetCooldown/startingCooldown` |
+| 预览动画片段 | `cfg.packetAnimeClip / packetAnimeOffset / packetAnimeScale` | 必须在 `CreateSprite()` 之前设 |
+
+⚠️ 取 `_override` 的四个 getter 都是「**`≠ -1` 就整份替换**」，不是相乘 ⇒
+* `packetCooldown` / `startingCooldown` 必须写 `characterConfig` 上的**基础值**，
+  写 `want.GetPacketCooldown()` 会把倍率乘**两次**。
+* `costRise` / `costMultiple` 写目标植物的值反而是对的（见下面价格那条）。
+
+#### ★★★ 皮肤（装扮）——两个必须知道的点
+
+1. **皮肤键在存档里，机制是「图层显隐」不是换精灵**：
+   `XWModPlayerProgressService.GetPacketState(saveKey)["Key"]["Custom"]`
+   → `characterConfig.customData.SetCustomFliters(spr, key)`
+   （`CharacterCustomConfig.animeFliterOpen/animeFliterClose` → `customDictionary[key]["Open"/"Close"]`）。
+   我们卡面精灵虽是**目标植物**的场景实例，但 `config.saveKey` 是 `MyKey`
+   ⇒ 游戏那条 `characterConfig.customData`（自己的）里**没有**目标植物的皮肤表
+   ⇒ 必须**手动**取**目标植物全局配置**的 `customData` 来套。
+
+2. ★★★ **改完滤镜必须重提一次渲染，否则画面停在旧帧 —— 表现就是「皮肤没生效」。**
+   游戏自己的 `TowerDefenseInGamePacketShow.OnCharacterSkinSwitched()` 序列：
+   ```csharp
+   ClearCustomFliters → SetCustomFliters → UpdateMediaReplaceData → UpdateChild
+   → RefreshManagedSlotSpriteCacheForRender()          // ★ internal，跨程序集不可调！
+   → FreezePreviewTree(sprite, forcePoseRefresh: true) // private
+   ```
+   卡面精灵是**冻结预览态**（`CreateSprite()` → `FreezePreparedPreviewTree()` 里 `SetFrozenPreview(true)`）。
+   `RefreshManagedSlotSpriteCacheForRender()` = `MarkManagedSlotSpriteCacheDirty() + GetManagedSlotSpritesForRender()`，
+   **两个都是 internal** ⇒ 只能拿**公开等价物**替代：
+   ```csharp
+   spr.UpdateMediaReplaceData();
+   spr.UpdateChild();
+   spr.QueueRedraw();
+   if (spr.IsFrozenPreview) spr.EnsureFrozenPreviewRenderSubmission();  // ★ 冻结态重提渲染
+   ```
+   （`EnsureFrozenPreviewRenderSubmission()` 正是 `FreezePreviewTree()` 内部用的那一句，
+   它是 `public`；`IsFrozenPreview` / `SetFrozenPreview(bool)` 也都是 public。）
+
+#### 价格（涨价植物 / 关卡改价）——错的是 `saveKey` 不是倍率
+
+`TowerDefenseInGamePacketShow.RefreshDynamicItemCost()`：
+```csharp
+baseItemCost = config.GetCost();
+long num = baseItemCost;
+if (!TowerDefenseManager.MapIgnoresDynamicPacketCostGrowth(config._GetType())) {
+    int n = TowerDefenseManager.Instance.GetCharacterNum(config.saveKey);   // ★ 按 card 自己的 saveKey 数场上数量
+    if (costMultiple != -1.0) num = floor(num * pow(costMultiple, n));
+    if (riseCost != -1)       num += n * riseCost;
+}
+itemCost = num;
+```
+* `Init()` 里 `riseCost = config.GetCostRise(); costMultiple = config.GetCostMultiple();`
+  ⇒ 只要 `_override` 写的是目标植物的值，**倍率本来就是对的**；
+* 唯一错的是 **计数用的 `saveKey`**（模仿者卡 `MyKey`，种下即变身走人 ⇒ 计数恒 0）
+  ⇒ 金/钻/彩那种「越种越贵」的植物**价格完全跟不上**。
+* 修法：按 `want.saveKey` 重算 `floor(cost*multiple^n) + n*riseCost`，**直接写 `card.itemCost`**
+  （setter 内部会刷标签：`riseCost != -1` 时才拼 `+`）。
+* 每帧调用即可 —— 游戏只在 `_runtimeCostDirty` 时刷（**事件驱动、非每帧**），
+  我们每帧覆盖 ⇒ 我们赢，最多 1 帧闪烁。
+* 判据用 `MapIgnoresDynamicPacketCostGrowth(want._GetType())`（我们的 `_override.type` 已是目标植物的 ⇒ 两边一致）。
+
+⚠️ **`GetCost()` / `GetCostRise()` 返回 `int`**；`TowerDefenseManager.GetCharacterNum(key)` 返回 `int`。
+
+### 3.7 ★★ 一张"复制别人"的卡，**卡槽里同时有多张**时怎么各跟各的
+
+场景：模仿者类 Mod（`saveKey` 恒为 `MyKey`）。选卡模式下"跟随最后选择的那张"够用，但
+**预选卡模式（关卡 `Feature[SeedBank].Data.Method == "PRESET"`）** 允许关卡把卡组写成
+**实卡 / 模仿者交替**（用户实测关卡：热狗·模仿者·豌豆炮·模仿者·加农炮·模仿者·冰炮·模仿者·末日炮·模仿者）。
+此时若所有模仿者都跟同一个目标 ⇒ **5 张卡长得一模一样**，交替设计的意图完全看不出来。
+
+#### (a) 数据链路（照抄即可）
+* 关卡预选卡存在 DIY 关卡文件里：`user://Csharp/Diy/<id>.tres` —— **纯文本 .tres，可直接读**，
+  `Feature` 是一个 `[sub_resource type="JSON"]`，里面 `&"SeedBank": {"Method":"PRESET","Packet":[…]}`。
+  ★ 调试"关卡配了什么卡"时这是最快的一手证据。
+* 战斗期填充：`TowerDefenseBattleFeaturePacketBank.PacketBankInit()` → case `PRESET`：
+  `seedBank.DeleteAllPacket()` → 按 `config.packetList` 顺序逐张 `seedBank.AddPacket(packet)` → `ReadyPackets()`。
+  ⇒ **`seedBank.packetList` 的顺序 = 关卡里配的顺序 = 选卡模式下玩家选择的顺序**，两种模式口径统一。
+* ★ `AddPacket` 内部 `CreateRoundPacketConfig()` = `source.Duplicate(deep:true)`
+  ⇒ **每张卡一份独立副本**，逐张写 `cfg._override` **不会互相覆盖**（别以为共享而绕远路）。
+* 槽位数：`GetRequiredSlotNum() = max(seedbankPacketMax, packetList.Count)`，
+  **PRESET 模式 `seedbankPacketMax = 16`**（依据 `TowerDefensePlantLuckyBlover`）。
+
+#### (b) 卡面：逐张按"左邻最近实卡"解析
+按 `packetList` 顺序扫一遍，维护 `prevPlant`（`characterConfig is TowerDefensePlantConfig` 的最后一张），
+遇到模仿者就记 `targets[card.GetInstanceId()] = prevPlant`；无左邻 ⇒ 回退全局"最后一次选择"。
+
+#### (c) ★★★ 变身目标：**必须在"拿起卡"时锁定并锁存**
+`TowerDefensePlantImitater.Explode()` 是**种下、旋转动画播完之后**才跑，从角色的
+`packetBank` 字段 `GetCategory("White") + GetCategory("Original")` 里 `PickRandom()` 抽一张
+（`packetBank` 是**角色实例字段**，`ExportVariantSave` 会存它）。
+"把池收窄成只剩目标一张"这套（§3.6 的 `PointColourBankAt`）**池只能有一份内容**，
+而卡槽里可能同时存在多张目标不同的模仿者卡 ⇒ 唯一正确时机是
+**`PacketPickControl.packetPick` 变成某张模仿者卡的那一刻**（要种下必然先拿起）：
+```csharp
+var held = GetMember(packetPickControl, "packetPick") as TowerDefenseInGamePacketShow;
+if (held != null && held.originalSaveKey == MyKey) _latchedTarget = targetsOf(held);
+PointColourBankAt(_latchedTarget ?? _lastPlant);
+```
+★ **放下后不要还原**（Explode 那时才跑）；换关卡时清空。
+★ `PacketPickControl.PickPacket()` 里 `packetPick = _packet` ⇒ **拿起的卡就是卡槽里那个节点本身**（不是克隆）
+⇒ 可以直接用 `GetInstanceId()` 做身份键。
+
+#### (d) 手机端选卡槽布局（读截图时别误判成 bug）
+`TowerDefenseInGameSeedBank` 两套：PC = `PacketSlotContainer`/`PacketContainer` 两个 **HBoxContainer**（单排）；
+手机 = `MobilePacketSlotContainer`/`MobilePacketContainer` 两个 **VFlowContainer**
+（min size `(0,552)`、`h_separation = v_separation = 2`）。
+槽位占位 `TowerDefenseInGamePacketSlot` 手机端 = **96×60、`PacketSilhouette.png`、`modulate.A = 0.5`**
+⇒ **8 行一列**；外层 `MobileISeedContanin` min 宽 194（= 2 列）。
+⇒ 16 个槽位 + 10 张卡 = 第一列 8 张、第二列 2 张，**第二列第 3~8 行露出 6 个半透明"幽灵格"**——
+**那是正常的空槽占位，不是渲染 bug**（排查此类截图时先算一遍槽位/卡数再下结论）。
+
 ## 4. 入口实现纪律
 
 * 三个回调 `Initialize(XWModRuntimeContext)` / `OnAllModsLoaded()` / `Shutdown()`
