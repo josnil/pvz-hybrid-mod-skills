@@ -1,12 +1,37 @@
 # -*- coding: utf-8 -*-
 """反证 slice 变换语义：把 .tres 算出的帧包围盒与栅格合成图 tile 实测包围盒对齐。"""
 import sys
-sys.path.insert(0, r'D:/zzz/pvzHE/pvz-hybrid-mod-skills/tools/zombie')
+# sys.path 由适配块处理
 from anime_io import parse_tres
 from PIL import Image
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
 
-TRES = r'D:/zzz/pvzHE/解包/植物大战僵尸杂交版V0.28/Asset/Anime/Character/Zombie/Chapter1/Normal/ZombieNormal.tres'
-COMP = r'D:/zzz/pvzHE/解包/植物大战僵尸杂交版V0.28/Asset/Anime/Character/Zombie/Chapter1/Normal/Generated/ZombieNormalRasterComposite.png'
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'zombie')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
+
+TRES = _os.path.join(UNPACK, "Asset/Anime/Character/Zombie/Chapter1/Normal/ZombieNormal.tres")
+COMP = _os.path.join(UNPACK, "Asset/Anime/Character/Zombie/Chapter1/Normal/Generated/ZombieNormalRasterComposite.png")
 TW, TH = 105, 134
 COLS = 32
 ANCHOR = (52.0, 86.0)   # = -origin

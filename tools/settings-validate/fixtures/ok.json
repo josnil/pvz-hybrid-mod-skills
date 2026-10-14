@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 2,
+  "id": "fixture-ok",
+  "name": "夹具",
+  "version": "1.0.0",
+  "author": "apples1949",
+  "description": "x",
+  "dependencies": [],
+  "conflicts": [],
+  "provides": {},
+  "overrides": {},
+  "scripts": [],
+  "runtimeAssembly": "Runtime/ModAssembly.dll",
+  "runtimeEntryType": "Fixture",
+  "runtimeApiVersion": 3,
+  "runtimeAssemblyPolicy": "optional",
+  "blueprints": [],
+  "translations": [],
+  "resources": [
+    "Runtime/ModAssembly.dll"
+  ],
+  "settings": [
+    {
+      "key": "enabled",
+      "type": "bool",
+      "label": "启用",
+      "group": "常规",
+      "default": true,
+      "applyMode": "immediate",
+      "affectsGameplay": false
+    },
+    {
+      "key": "corner",
+      "type": "enum",
+      "label": "角落",
+      "group": "常规",
+      "default": "tl",
+      "applyMode": "immediate",
+      "affectsGameplay": false,
+      "options": [
+        {
+          "value": "tl",
+          "label": "左上"
+        },
+        {
+          "value": "br",
+          "label": "右下"
+        }
+      ],
+      "visibleWhen": {
+        "key": "enabled",
+        "op": "eq",
+        "value": true
+      }
+    },
+    {
+      "key": "x",
+      "type": "int",
+      "label": "X",
+      "group": "常规",
+      "default": 10,
+      "min": 0,
+      "max": 200,
+      "step": 1,
+      "applyMode": "immediate",
+      "affectsGameplay": false
+    },
+    {
+      "key": "about",
+      "type": "text",
+      "label": "关于",
+      "group": "关于",
+      "content": "hello"
+    }
+  ]
+}

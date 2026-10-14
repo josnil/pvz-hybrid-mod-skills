@@ -2,8 +2,8 @@
 """奶龙僵尸 —— 素材管线（抠图 / 量测 / 图集 / 离线预览）。
 
 输入（用户提供的三件素材）：
-    C:/Users/yanxulin002/Pictures/奶龙.avif     站立全身（1152x1795 有效）
-    C:/Users/yanxulin002/Pictures/奶龙笑.avif   大笑半身（1192x1370 有效）
+    环境变量 NAILONG_BODY 指向的站立图     站立全身（1152x1795 有效）
+    环境变量 NAILONG_LAUGH 指向的大笑图   大笑半身（1192x1370 有效）
     D:/啊这/.../奶龙笑_爱给网_aigei_com.mp3      大笑音频
 
 输出（落 CACHE，供 build_zombie_nailong.py 同步进包）：
@@ -28,13 +28,38 @@ import sys
 from collections import deque
 
 from PIL import Image
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
+
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'zombie')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, ".cache_nailong")
 os.makedirs(CACHE, exist_ok=True)
 
-SRC_BODY = r"C:/Users/yanxulin002/Pictures/奶龙.avif"
-SRC_LAUGH = r"C:/Users/yanxulin002/Pictures/奶龙笑.avif"
+SRC_BODY = _os.environ.get("NAILONG_BODY", "")      # 作者本机素材，未随包分发；用前设 NAILONG_BODY=<站立图>
+SRC_LAUGH = _os.environ.get("NAILONG_LAUGH", "")    # 同上，设 NAILONG_LAUGH=<大笑图>
 SRC_AUDIO = r"D:/啊这/2819680957/FileRecv/枪械图片/识别结果/奶龙笑_爱给网_aigei_com.mp3"
 
 BOTTOM_TRIM = 3          # 素材底边的深色压条

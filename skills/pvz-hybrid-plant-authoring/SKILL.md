@@ -424,6 +424,10 @@ override 里**只写 `coverCanDirectPlant` 一个字段**（其余默认值全�
 | `references/plant-pmod-hotpatch.md` | **只有 .pmod 没有生成器**，直接热补丁数值属性（cost/射速/血量…）时 |
 | `assets/新建植物清单.md` | **Step 0 一开始就打开**，逐项打勾 |
 
+> ★ **交付打包**（「打包到桌面」/「做全量包」）在 `pvz-hybrid-mod-authoring/SKILL.md`
+> 的〈交付给用户时的「工作目录 zip」格式〉一节，含 **全量包 vs 单包** 的区分口径与
+> `_pack_all.py` 的 `WANT` 清单维护规则（新增/拆包一个 Mod 后必须同步改，否则新包不进 zip）。
+
 ---
 
 ## ★★ 最省事的「复用内置角色」路线（2026-09-29 实测：经典模仿者 Mod）

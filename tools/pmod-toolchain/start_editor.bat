@@ -3,7 +3,10 @@ setlocal
 cd /d "%~dp0"
 
 rem ---- PVZ hybrid-edition Mod editor launcher ----
-set "PY=%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe"
+rem 本机适配：优先显式指定（PVZ_PY 环境变量），否则用 PATH 上的 python
+set "PY=%PVZ_PY%"
+if not exist "%PY%" set "PY=py"
+if not exist "%PY%" set "PY=python"
 if not exist "%PY%" set "PY=python"
 
 rem usage:

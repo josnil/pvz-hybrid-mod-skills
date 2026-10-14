@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "id": "fixture-bad",
+  "name": "夹具",
+  "version": "1.0.0",
+  "author": "apples1949",
+  "description": "x",
+  "dependencies": [],
+  "conflicts": [],
+  "provides": {},
+  "overrides": {},
+  "scripts": [],
+  "runtimeAssembly": "Runtime/ModAssembly.dll",
+  "runtimeEntryType": "Fixture",
+  "runtimeApiVersion": 3,
+  "runtimeAssemblyPolicy": "optional",
+  "blueprints": [],
+  "translations": [],
+  "resources": [
+    "Runtime/ModAssembly.dll"
+  ],
+  "settings": [
+    {
+      "key": "corner",
+      "type": "enum",
+      "label": "角落",
+      "group": "常规",
+      "default": "tl",
+      "options": []
+    }
+  ]
+}

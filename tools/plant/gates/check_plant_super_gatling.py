@@ -22,12 +22,37 @@ import os
 import re
 import sys
 import zipfile
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
 
-WS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'plant')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
+
+WS = MOD_WORKSPACE
 BUILD = os.path.join(WS, "SuperGatlingPea")
 DIST = os.path.join(WS, "dist")
-MODS = r"C:\Users\yanxulin002\AppData\Roaming\Godot\app_userdata\植物大战僵尸杂交版\Mods"
-UNPACK = r"D:\zzz\pvzHE\解包\植物大战僵尸杂交版V0.28"
+MODS = MODS
+UNPACK = UNPACK
 BUILDER = os.path.join(WS, "build_plant_super_gatling.py")
 MAP_BUILDER = os.path.join(WS, "build_map_vampire_pool.py")
 

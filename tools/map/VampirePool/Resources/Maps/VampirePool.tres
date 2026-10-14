@@ -1,0 +1,130 @@
+[gd_resource type="Resource" script_class="TowerDefenseMapConfig" format=3]
+
+[ext_resource type="Script" uid="uid://eoxnow8u525l" path="res://Registry/Battle/Feature/Map/Resource/Cell/Config/TowerDefenseCellConfig.cs" id="1_cell"]
+[ext_resource type="Script" uid="uid://do66qasykqnkv" path="res://Registry/Battle/Feature/Map/Resource/TowerDefenseMapConfig.cs" id="2_map"]
+[ext_resource type="Script" uid="uid://d5q8v2n7m4k1c" path="res://Registry/Battle/Feature/Map/Resource/Rule/TowerDefenseMapRuleConfig.cs" id="3_rule_script"]
+[ext_resource type="Resource" uid="uid://d2v7m4q9k5h8c" path="res://Asset/Config/Map/Rules/Vampire.tres" id="4_rule"]
+
+[sub_resource type="Resource" id="Cell_1_1_9_6"]
+script = ExtResource("1_cell")
+pos = Vector4i(1, 1, 9, 6)
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_2_1_2_6"]
+script = ExtResource("1_cell")
+pos = Vector4i(2, 1, 2, 6)
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_4_1_4_6"]
+script = ExtResource("1_cell")
+pos = Vector4i(4, 1, 4, 6)
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_6_1_6_6"]
+script = ExtResource("1_cell")
+pos = Vector4i(6, 1, 6, 6)
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_8_1_8_6"]
+script = ExtResource("1_cell")
+pos = Vector4i(8, 1, 8, 6)
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_1_2_9_2"]
+script = ExtResource("1_cell")
+pos = Vector4i(1, 2, 9, 2)
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_1_4_9_4"]
+script = ExtResource("1_cell")
+pos = Vector4i(1, 4, 9, 4)
+gridType = Array[int]([3, 4])
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_2_2_2_2"]
+script = ExtResource("1_cell")
+pos = Vector4i(2, 2, 2, 2)
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_4_2_4_2"]
+script = ExtResource("1_cell")
+pos = Vector4i(4, 2, 4, 2)
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_6_2_6_2"]
+script = ExtResource("1_cell")
+pos = Vector4i(6, 2, 6, 2)
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_8_2_8_2"]
+script = ExtResource("1_cell")
+pos = Vector4i(8, 2, 8, 2)
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_2_4_2_4"]
+script = ExtResource("1_cell")
+pos = Vector4i(2, 4, 2, 4)
+gridType = Array[int]([3, 4])
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_4_4_4_4"]
+script = ExtResource("1_cell")
+pos = Vector4i(4, 4, 4, 4)
+gridType = Array[int]([3, 4])
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_6_4_6_4"]
+script = ExtResource("1_cell")
+pos = Vector4i(6, 4, 6, 4)
+gridType = Array[int]([3, 4])
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_8_4_8_4"]
+script = ExtResource("1_cell")
+pos = Vector4i(8, 4, 8, 4)
+gridType = Array[int]([3, 4])
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_1_5_9_5"]
+script = ExtResource("1_cell")
+pos = Vector4i(1, 5, 9, 5)
+gridType = Array[int]([3, 4])
+ElementFlags = 8
+
+[sub_resource type="Resource" id="Cell_2_5_2_5"]
+script = ExtResource("1_cell")
+pos = Vector4i(2, 5, 2, 5)
+gridType = Array[int]([3, 4])
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_4_5_4_5"]
+script = ExtResource("1_cell")
+pos = Vector4i(4, 5, 4, 5)
+gridType = Array[int]([3, 4])
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_6_5_6_5"]
+script = ExtResource("1_cell")
+pos = Vector4i(6, 5, 6, 5)
+gridType = Array[int]([3, 4])
+ElementFlags = 4
+
+[sub_resource type="Resource" id="Cell_8_5_8_5"]
+script = ExtResource("1_cell")
+pos = Vector4i(8, 5, 8, 5)
+gridType = Array[int]([3, 4])
+ElementFlags = 4
+
+[resource]
+script = ExtResource("2_map")
+translate = "吸血鬼屋泳池"
+mapTexturePath = "res://Asset/Texture/TowerDefense/Background/TowerDefenseMap/Vampire/Vampire.jpg"
+mapScenePath = "res://Asset/Config/Map/Vampire/Vampire/TowerDefenseMapVampire.tscn"
+gridNum = Vector2i(9, 6)
+gridBeginPos = Vector2(260, 74)
+gridSize = Vector2(80, 83.6667)
+cellConfig = Array[ExtResource("1_cell")]([SubResource("Cell_1_1_9_6"), SubResource("Cell_2_1_2_6"), SubResource("Cell_4_1_4_6"), SubResource("Cell_6_1_6_6"), SubResource("Cell_8_1_8_6"), SubResource("Cell_1_2_9_2"), SubResource("Cell_1_4_9_4"), SubResource("Cell_2_2_2_2"), SubResource("Cell_4_2_4_2"), SubResource("Cell_6_2_6_2"), SubResource("Cell_8_2_8_2"), SubResource("Cell_2_4_2_4"), SubResource("Cell_4_4_4_4"), SubResource("Cell_6_4_6_4"), SubResource("Cell_8_4_8_4"), SubResource("Cell_1_5_9_5"), SubResource("Cell_2_5_2_5"), SubResource("Cell_4_5_4_5"), SubResource("Cell_6_5_6_5"), SubResource("Cell_8_5_8_5")])
+lineUse = Array[int]([1, 2, 3, 4, 5, 6])
+isNight = true
+useSunFall = false
+specialRules = Array[ExtResource("3_rule_script")]([ExtResource("4_rule")])

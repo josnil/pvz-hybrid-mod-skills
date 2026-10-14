@@ -122,15 +122,64 @@ cp plant/build_plant_super_gatling.py plant/build_plant_<新名>.py
 python tools/pmod-toolchain/verify_pmod.py dist/<你的mod>.pmod
 ```
 
-## ⚠️ 环境适配（上传前必读）
+## ⚠️ 环境适配
 
-这些脚本来自作者的 Windows 工作环境，**部分路径是写死的**，使用前请按你的环境修改：
+> ✅ **本工作区已经做完适配**（2026-10-01）。下面第 1~3 条讲的写死路径**已经改掉**：
+> 现在所有脚本都从 `tools/_env.py`（唯一路径真相源）推导，各流水线另有 `_gen.py`
+> 定位自己的工作区。换机器时**只需要改 `_env.py` 一个文件**，或者设环境变量。
+> 各脚本顶部会自动注入一段适配块（带 `# --- 本机路径适配 ---` 标记），
+> 原来的写死常量已替换成 `from _env import …`。
 
-1. **游戏解包路径**：多处出现 `D:\zzz\pvzHE\解包\植物大战僵尸杂交版V0.28\`（引擎源码判据树），请替换为你的解包目录；
-   > 🧩 解包树**必须**用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases) 解出（**禁止**其他工具 / 自制脚本），下载与用法见 **[UNPACKING.md](../UNPACKING.md)**。
-2. **两份游戏构建**：闸门脚本会各跑一遍 `…\0.28.1\植物大战僵尸杂交重制版\…` 与 `D:\zzz\植物大战僵尸重制版\…`，单构建用户改剩一份即可；
-3. **工作区路径**：`.cache` 系脚本假定在 `ModWorkspace/.cache/` 下运行，且多数引用同级生成器；
-4. **角色定制**：生成器顶部常量区（`MOD_NAME` / `CHAR_KEY` / 数值）就是给你改的——**只改常量，别重构**；
-5. 版本基准为杂交版 **V0.28**；引擎更新后以 `addons/ModEditor/ModSystem/` 源码为最终判据。
+### 路径怎么解析的
+
+```
+<工作区>/                       ← 含 unpack/ 、data_PlantsVsZombies_*/ 、mods/
+├── pvz-hybrid-mod-skills/
+│   └── tools/
+│       ├── _env.py             ← ★ 唯一路径真相源（UNPACK / GAME / CLASSIC / MODS / PY）
+│       └── <流水线>/_gen.py     ← 该流水线的工作区 WS（生成器 + runtime_src_*/ + dist/）
+├── unpack/                     ← 解包树（判据）
+├── data_PlantsVsZombies_*/     ← 游戏本体（GodotSharp.dll + PlantsVsZombies.dll）
+└── mods/                       ← 6 个成品 Mod，另有 mods/_modenv.py
+```
+
+### 可覆盖的环境变量
+
+| 变量 | 用途 | 本机默认 |
+|---|---|---|
+| `PVZ_WORKSPACE` | 工作区根（跳过自动推导） | 自动向上找 `unpack/` + `data_PlantsVsZombies_*/` |
+| `PVZ_UNPACK` | 游戏解包树（引擎源码判据） | `<工作区>/unpack` |
+| `PVZ_GAME` | 游戏本体目录（编译插件要的 DLL） | `<工作区>/data_PlantsVsZombies_windows_x86_64` |
+| `PVZ_CLASSIC` | 经典未重置版素材树（**换外观才需要**） | ⚠️ **未配置**（这份素材不在本仓库里） |
+| `PVZ_MODS` / `PVZ_UD` | 游戏 Mods / app_userdata 目录 | `%APPDATA%\Godot\app_userdata\植物大战僵尸杂交版` |
+| `PVZ_PY` | `.bat` 启动器用的解释器 | PATH 上的 `python` / `py` |
+
+### 其余注意事项
+
+1. **解包树**必须用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases) 解出（**禁止**其他工具 / 自制脚本），下载与用法见 **[UNPACKING.md](../UNPACKING.md)**。
+   自检：树里同时有 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/`，且能搜到 `Asset/Config/Projectile/ProjectileResource.json`。
+2. **单构建**：闸门脚本原本各跑一遍 remake/console 两份构建，本机只有一份 ⇒ 已收敛成 `("ref", REF_DIR)` 一行。
+3. **生成器的外观标定文件**：`build_plant_super_gatling.py` 依赖 `<工作区>/.cache/skin_params.json`，
+   它由 `skin/build_official_skin.py` 从 **经典版 reanim** 生成。**没有 `PVZ_CLASSIC` 就跑不了**
+   （`--self-check` 会以 `FileNotFoundError` 明确报出来，不会静默出错）。要跑通这条样板请先准备经典版解包树。
+   > 📌 技能文档 `GETTING_STARTED.md` 里写的 `--self-check` 开关在生成器里实际叫 **`--check`**
+   > （`--check` = 只验证磁盘现状、不重建；不带参数 = 重建后再自检）。
+4. **.NET SDK**：插件是 `net9.0`（游戏自带 .NET 9.0.17 运行时、`global.json` 锁 SDK 9.0.315）。
+   本机已装 **9.0.318**。⚠️ 只有 SDK 6 的机器**编不过**：`GodotSharp` 用 `System.Runtime 8.0`，
+   SDK 6 会报 `CS1705`。
+5. **角色定制**：生成器顶部常量区（`MOD_NAME` / `CHAR_KEY` / 数值）就是给你改的——**只改常量，别重构**。
+6. 版本基准为杂交版 **V0.28**（本工作区是 **0.29.0**）；引擎更新后以 `addons/ModEditor/ModSystem/` 源码为最终判据。
+
+### 验证过的状态（2026-10-01）
+
+| 项 | 结果 |
+|---|---|
+| 全部 70 个 `.py` | 语法解析通过（Python 3.12.14） |
+| 编译 6 个 Mod 插件（net9.0 + 真实游戏 DLL） | 6/6 成功，产物与包内 `ModAssembly.dll` **逐字节一致** |
+| `mods/TimeStop` 全链路（编译→打包→装机） | 通过；重新生成的 `.pmod` 与原发布包 **MD5 一致** |
+| `verify_pmod.py` 校验 6 个成品包 | 6/6 通过，FAIL=0 |
+| `build_plant_super_gatling.py` | ⚠️ 卡在缺 `PVZ_CLASSIC`（见上第 3 条） |
+
+排除了什么：编译中间产物（`obj/` `.build/` `bin/`）、生成器的构建输出工程（`SuperGatlingPea/` 等可由生成器再生成）、成品 `.pmod`、对照用 PNG 截图、一次性探针脚本，以及已过期的 `_sq_head_place.py`（被 `head-tools/_j16_resize.py` 取代）。
 
 排除了什么：编译中间产物（`obj/` `.build/` `bin/`）、生成器的构建输出工程（`SuperGatlingPea/` 等可由生成器再生成）、成品 `.pmod`、对照用 PNG 截图、一次性探针脚本，以及已过期的 `_sq_head_place.py`（被 `head-tools/_j16_resize.py` 取代）。

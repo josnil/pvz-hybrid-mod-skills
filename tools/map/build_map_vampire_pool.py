@@ -50,7 +50,7 @@ F. 「游戏跑哪个」——.pmod 与工程目录是两回事（本次新增�
      才会把这个工程压成 `user://Mods/<工程名>.pmod`。
 
      ⇒ 为了让「改完就能跑」且与游戏侧编辑器**完全同构**，本脚本同时产出：
-        ① 工作区构建目录  .workbuddy/ModWorkspace/VampirePool/
+        ① 工作区构建目录  tools/map/VampirePool/
         ② 游戏侧工程目录  Mods/吸血鬼屋泳池/   （72 个标准子目录 + mod.json + <名>.pvzmodeproject）
         ③ 可加载安装包    Mods/吸血鬼屋泳池.pmod
       工程名 / 工程文件名 / pmod 文件名三者一致，所以在编辑器里再点一次「导出」
@@ -97,10 +97,35 @@ import stat
 import sys
 import zipfile
 from datetime import datetime, timedelta, timezone
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
+
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'map')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
 
 # ---------------------------------------------------------------- 路径
 WS = os.path.dirname(os.path.abspath(__file__))
-UNPACK = r"D:\zzz\pvzHE\解包\植物大战僵尸杂交版V0.28"
+UNPACK = UNPACK
 SRC_TRES = os.path.join(UNPACK, "Asset", "Config", "Map", "Vampire", "VampireMapVampire.tres")
 
 BUILD_DIR = "VampirePool"         # 工作区里的构建目录（ASCII，稳定，不随游戏侧命名变化）

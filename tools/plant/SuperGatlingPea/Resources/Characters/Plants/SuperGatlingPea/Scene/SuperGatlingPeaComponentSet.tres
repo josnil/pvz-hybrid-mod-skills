@@ -1,0 +1,111 @@
+[gd_resource type="Resource" script_class="CharacterComponentSet" format=3]
+
+[ext_resource type="Resource" path="res://Script/Component/TowerDefense/Character/FireComponent/FireComponentStateMachine.tres" id="1"]
+[ext_resource type="Script" path="res://Resource/TowerDefense/Collision/AabbRay2DResource.cs" id="2"]
+[ext_resource type="Script" path="res://Registry/Projectile/Resource/TowerDefenseProjectileCreateData.cs" id="3"]
+[ext_resource type="Script" path="res://Script/Component/TowerDefense/Character/FireComponent/Resource/Projectile/FireComponentProjectileSingle.cs" id="4"]
+[ext_resource type="Script" path="res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentCheckConfig.cs" id="5"]
+[ext_resource type="Script" path="res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs" id="6"]
+[ext_resource type="Script" path="res://Script/Component/TowerDefense/Character/FireComponent/FireComponentDefinition.cs" id="7"]
+[ext_resource type="Resource" path="res://Prefab/TowerDefense/Character/ComponentSets/TowerDefensePlantComponentSet.tres" id="8"]
+[ext_resource type="Script" path="res://Script/Component/Runtime/CharacterComponentSet.cs" id="9"]
+
+[sub_resource type="Resource" id="Fire_AabbRay2DResource_forward"]
+script = ExtResource("2")
+
+[sub_resource type="Resource" id="Fire_Resource_createData"]
+script = ExtResource("3")
+projectileName = &"Pea"
+catapultHeight = 400.0
+
+[sub_resource type="Resource" id="Fire_Resource_single"]
+script = ExtResource("4")
+projectileData = SubResource("Fire_Resource_createData")
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/Projectile/FireComponentProjectileSingle.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_check"]
+script = ExtResource("5")
+projectile = SubResource("Fire_Resource_single")
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentCheckConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj0"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 0
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj1"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 1
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj2"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 2
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj3"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 3
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj4"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 4
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj5"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 5
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="Fire_Resource_proj6"]
+script = ExtResource("6")
+speed = 500.0
+dir = 0.0
+checkProjectileId = 0
+firePosId = 6
+metadata/_custom_type_script = "res://Script/Component/TowerDefense/Character/FireComponent/Resource/FireComponentFireProjectileConfig.cs"
+
+[sub_resource type="Resource" id="FireDefinition"]
+script = ExtResource("7")
+firePosMarkerPaths = [NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D2"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D3"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D4"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D5"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D6"), NodePath("SpriteGroup/TransformPoint/GatlingPea/Head/Marker2D7")]
+spritePath = NodePath("SpriteGroup/TransformPoint/GatlingPea/Head")
+checkRayResources = [SubResource("Fire_AabbRay2DResource_forward")]
+fireAnimeClipsArray = ["HeadFire"]
+fireAnimeClips = "HeadFire"
+fireAnimeTimeScale = 3.0
+spliceIdleAnimeClips = "HeadIdle"
+isSpliceSprite = true
+fireNum = 1
+lockProjectileGridY = true
+fireCheckList = [SubResource("Fire_Resource_check")]
+fireProjectileList = [SubResource("Fire_Resource_proj0"), SubResource("Fire_Resource_proj1"), SubResource("Fire_Resource_proj2"), SubResource("Fire_Resource_proj3"), SubResource("Fire_Resource_proj4"), SubResource("Fire_Resource_proj5"), SubResource("Fire_Resource_proj6")]
+ComponentTypeId = "FireComponent"
+DefinitionId = "mod.supergatlingpea.component.fire.character.plant.supergatlingpea"
+InstanceId = "character.fire"
+WireIndex = 0
+StateMachineDefinition = ExtResource("1")
+LegacyNodeNames = [&"FireComponent"]
+
+[resource]
+script = ExtResource("9")
+ParentSet = ExtResource("8")
+Components = [SubResource("FireDefinition")]

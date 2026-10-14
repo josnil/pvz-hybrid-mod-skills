@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "id": "supergatlingpea",
+  "name": "超级机枪射手",
+  "version": "1.0.0",
+  "author": "云漫行",
+  "description": "新增植物「超级机枪射手」：每 1.5 秒向前方一次齐射 7 颗豌豆（横向排开、互不重叠）；每次攻击有 10% 概率触发大招 —— 5 秒内倾泻约 300 颗豌豆。金卡，600 阳光，冷却 30.0 秒。（含托管运行时插件 Runtime/ModAssembly.dll）",
+  "dependencies": [],
+  "conflicts": [],
+  "provides": {
+    "Character": [
+      "SuperGatlingPea"
+    ],
+    "CharacterSprite": [
+      "SuperGatlingPea"
+    ],
+    "Packet": [
+      "SuperGatlingPea"
+    ]
+  },
+  "overrides": {},
+  "scripts": [],
+  "runtimeAssembly": "Runtime/ModAssembly.dll",
+  "runtimeEntryType": "SuperGatlingPeaRuntimeEntry",
+  "runtimeApiVersion": 1,
+  "runtimeAssemblyPolicy": "optional",
+  "blueprints": [],
+  "translations": [
+    "Localization/translations.csv"
+  ],
+  "resources": [
+    "Resources/Animations/SuperGatlingPea.dat",
+    "Resources/Animations/SuperGatlingPea.tres",
+    "Resources/Animations/SuperGatlingPeaAtlas.png",
+    "Resources/Cards/SuperGatlingPea.tres",
+    "Resources/Characters/Plants/SuperGatlingPea/Config/TowerDefensePlantSuperGatlingPea.tres",
+    "Resources/Characters/Plants/SuperGatlingPea/Packet/SuperGatlingPea.tres",
+    "Resources/Characters/Plants/SuperGatlingPea/Scene/SuperGatlingPea.tscn",
+    "Resources/Characters/Plants/SuperGatlingPea/Scene/SuperGatlingPeaComponentSet.tres",
+    "Resources/Characters/Plants/SuperGatlingPea/Sprite/SuperGatlingPea.tscn",
+    "Runtime/ModAssembly.dll"
+  ]
+}

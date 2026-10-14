@@ -14,6 +14,31 @@
   未设置字段 = 哨兵 -10000.0f
 """
 import os, re, struct, zlib, sys, json
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
+
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'skin')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
 
 SENT = -10000.0
 REC = 44
@@ -94,7 +119,7 @@ def parse_xml(path):
 
 
 if __name__ == "__main__":
-    BASE = r"D:\zzz\extract_1789988101"
+    BASE = require_classic("reanim 解码")   # ← 环境变量 PVZ_CLASSIC
     BIN = os.path.join(BASE, "compiled", "new", "Zombie_polejaker.reanim.compiled")
     XML = os.path.join(BASE, "compiled", "new", "Zombie_polejaker.reanim")
     d = decode(BIN)

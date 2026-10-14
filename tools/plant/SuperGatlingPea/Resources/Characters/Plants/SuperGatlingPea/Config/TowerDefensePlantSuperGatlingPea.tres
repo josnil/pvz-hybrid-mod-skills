@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TowerDefensePlantConfig" format=3]
+
+[ext_resource type="Script" path="res://Resource/TowerDefense/Character/Config/TowerDefensePlantConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+name = "SuperGatlingPea"
+hitpoints = 1000.0
+canCopy = false
+damagePointData = null
+armorData = null
+customData = null
+ashScene = null
+homeWorld = 1
+costRise = 100
+cost = 600
+packetCooldown = 30.0
+plantCover = ["PlantPeaShooter"]
+maskFlags = 9
+metadata/_custom_type_script = "res://Resource/TowerDefense/Character/Config/TowerDefensePlantConfig.cs"

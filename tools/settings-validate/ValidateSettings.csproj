@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    离线校验 mod.json 的 settings 声明 —— 不开游戏。
+    反射宿主 XWModSettingsService.ValidateDefinitions，把宿主自己的校验规则跑一遍。
+    用法见同目录 README.md。
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>ValidateSettings</AssemblyName>
+    <RootNamespace>ValidateSettings</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
+    <RestorePackages>false</RestorePackages>
+  </PropertyGroup>
+
+  <!--
+    刻意**不引** GodotSharp / PlantsVsZombies，也不加 <Reference>：
+    程序在运行时用 Assembly.LoadFrom 载入宿主程序集并走反射，
+    所以连 NuGet 还原都能省掉（离线可构建）。
+  -->
+
+</Project>

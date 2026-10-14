@@ -10,12 +10,37 @@
 """
 import os
 import sys
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
+
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'zombie')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anime_io  # noqa: E402
 
-GAME = r'D:\zzz\植物大战僵尸杂交版0.28.1\植物大战僵尸杂交重制版'
-UNPACK = r'D:\zzz\pvzHE\解包\植物大战僵尸杂交版V0.28'
+GAME = REF_DIR
+UNPACK = UNPACK
 NORMAL = os.path.join(UNPACK, 'Asset', 'Anime', 'Character', 'Zombie', 'Chapter1', 'Normal')
 
 OFFSET = (-40.0, -80.0)          # 内置 ZombieNormal 精灵节点的 offset

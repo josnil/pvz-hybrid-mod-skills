@@ -6,6 +6,18 @@ agent_created: true
 
 # 手写 PvZ 杂交版 .pmod Mod
 
+> 📌 **先说版本**：本技能线到 0.29.0 为止的经验 + **文末两节**
+> （「0.30.0 适配 + 12 Mod 实机调试全程沉淀」2026-10-11；
+> 「宿主配置体系（`XWModSettings` + 配置页 UI）实机调试沉淀」2026-10-12）共同构成当前判据。
+> **动手前请先读文末那两节**，它们包含：
+> **BCL 裁剪表 + 反射替代写法**、**宿主安全模式（`mod_boot_journal.json`）**、
+> **UI 组件真相（`MainButton` 是 TextureButton / 文字走 `text` 属性）**、
+> **SeedBank 卡槽结构真相**、**UI 挂载被裁剪导致点不动**、**构建链路静默失败**、
+> **跨版本升级最小清单**；以及**配置热生效（`Settings.Changed` 订阅模板 + 三个静默失效条件）**、
+> **改键/录制面板走宿主保存管道（fingerprint 陷阱）**、**配置页注入锚点归属校验**、
+> **「假修复」（构建成功 ≠ 代码进去了）**、**共享组件文件改动不触发重编译**。
+> 其中多数坑**与版本无关**，做任何新 Mod 都会遇到。
+
 > ### ⛔ 解包硬性规定（第一步，不可绕过）
 >
 > 本技能的一切判据都来自**解包树**。**解包必须使用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，禁止使用其他工具或自制脚本解包。**
@@ -57,6 +69,27 @@ agent_created: true
 **两份游戏构建各跑一遍**）、`.cache/check_idempotent_*.py`（3 连跑字节稳定 + 增量清理 + 镜像一致），
 以及一个只读收尾核对脚本（`.cache/final_report_*.py`）。
 
+## ★ 交付给用户时的「工作目录 zip」格式（2026-09-28 用户指定）
+
+> 用户说「打包到桌面」时，**要的是把整个 Mod 工程目录 + 技能仓库目录一起压成一个 zip**，
+> 不是只给 `.pmod`，也不是自创 `01_成品/02_源码/03_技能记录/` 分类目录（该做法已被明确否掉）。
+
+参照样本：`C:\Users\txgcs\Downloads\杂交版Mod制作-打包-20260927-v2.zip`
+
+### 顶层结构（每个 Mod 一个目录，平铺）
+
+```
+<ModName>/                        <- 完整工程目录，原样打入（不要拆分类）
+    README.md                     <- 该 Mod 的交付文档（含需求映射/硬约束/已知副作用/未验证项）
+    mod.json
+    build_pmod.py                 <- 构建+打包+安装脚本
+    runtime_src/                  <- 托管代码源码（.cs / .csproj）
+    Runtime/ModAssembly.dll       <- 编译产物
+    build*.log                    <- 历次构建日志（保留，便于追溯）
+    dist/<ModName>.pmod           <- ★ 成品 pmod 放工程内 dist/ 子目录
+pvz-hybrid-mod-skills-main/       <- 技能仓库完整目录（skills/ + tools/ + README）
+```
+
 ### 打法要点
 - **源码 = 工程目录自身**（`runtime_src/` 下），不要再另建 `02_源码/`。
 - **技能记录 = 技能仓库目录自身**（`skills/*/SKILL.md`），不要再另建 `03_技能记录/`。
@@ -66,6 +99,34 @@ agent_created: true
   再用 `zipfile.ZipFile(tmp, "w", ZIP_DEFLATED)` 按 `relpath` 写入，最后删临时目录。
 - 文件名建议 `杂交版Mod制作-打包-YYYYMMDD-<mod1>-<mod2>.zip`（与参照包命名风格一致）。
 - **输出到用户真实桌面 `C:\Users\txgcs\DesktopNew\`**（不是 `C:\Users\txgcs\Desktop`）。
+
+### ★★ 「全量包」vs「单包」——先问清楚再动手（2026-09-30 定案）
+
+用户说「**做全量包**」= 一次把**工作区里全部 Mod 工程 + 技能仓库**打进同一个 zip（上面那套顶层结构），
+**不是**只打刚改的那个 Mod。说「先别急着做全量包」= 这一轮只编译装机单个 pmod，zip 一个字都别动。
+
+* 实现脚本：本项目 `C:\Users\txgcs\WorkBuddy\zjb\mod\_pack_all.py`（可复用，改日期/`WANT` 即可）。
+* **`WANT` 列表就是"包清单"，是唯一的真源**：
+  ```python
+  WANT = ["HealthCooldownLine", "ImitaterClassic", "MobileTapFeedback",
+          "MobileUXFixes", "TimeStop", "WhiteCardCategories"]
+  ```
+  ⚠️ **新增/拆包一个 Mod 后必须同步改 `WANT`**，否则新包不进 zip（用户拿到会发现"少了一个"）。
+* 用 `os.listdir()` 拿**真实目录名**再做大小写不敏感匹配（Windows 下 `mod/healthcooldownline/`
+  与 `HealthCooldownLine` 都得命中，硬编码会漏）。
+* ★ 脚本做两件事，**先补 `dist/` 再压缩**：
+  1. 把共享母目录 `mod/dist/<X>.pmod` 复制进每个工程自己的 `dist/`（交付包要求工程内自带成品）；
+  2. `os.walk` 各工程 + 技能仓库，按 `relpath` 写入，排除 `.git` / `.vs`。
+* 打完**必须回读 zip 自检**（别只看脚本 exit 0）：
+  ```python
+  ns = z.namelist()
+  print(sorted({n.split("/")[0] for n in ns}))     # 顶层目录数应 == len(WANT) + 1(技能仓库)
+  for n in ns:
+      if n.endswith(".pmod"): print(n, z.getinfo(n).file_size)   # 逐个 pmod 大小对齐单体构建
+  ```
+  核对三点：**顶层目录数**、**每个 pmod 都在 `<ModName>/dist/` 下且字节数 == 单包产物**、
+  **技能仓库条目数**（本次 400+ 条目正常，只有几十条说明技能目录没进去）。
+* 交付前后把 zip 的 **md5 + 字节数 + 条目数** 一并报给用户（用户习惯拿这组数核对是否换新）。
 
 ## 包结构
 
@@ -1523,7 +1584,8 @@ insertLayerId = 16
 ## 托管代码 Mod（已实测可用）
 
 `runtimeAssembly = "Runtime/ModAssembly.dll"` + `runtimeEntryType`（实现 `IXWModRuntimeEntry`）
-+ `runtimeApiVersion = 1` + `runtimeAssemblyPolicy = "required"|"optional"`，
++ `runtimeApiVersion = `**宿主当前 API 版本**（**0.29.0 = `1`；0.30.0 = `3`**，随版本变，写错即整包回滚）
++ `runtimeAssemblyPolicy = "required"|"optional"`，
 且 `schemaVersion` 必须 = 2（`XWModRuntimeCompatibility.ValidatePackage`）。
 运行期可调 `XWModRuntimeRegistry.Register(...)`，能拿到 `TowerDefenseManager` /
 `BattleEventBus` / `ResourceManager` / `ObjectManager`（`PVZApiRegistry` 暴露的 4 个类）。
@@ -1623,9 +1685,15 @@ TowerDefenseManager.Instance.AddPacket("<卡key>", ov);     // 内部：GetSeedB
    `ResolveDeclaredRuntimeAssembly:918`）——写别的路径**硬拒**，`policy` 救不了。
    ⚠️ 这是**包内物理路径**，**不是**程序集身份 —— 程序集身份另有一条安卓专属协定，
    见下面 **「★★★ 跨平台（安卓）程序集标识」**（**每个 Mod 的 `.csproj` 都必须写自己的 `<AssemblyName>`**）。
-2. `runtimeApiVersion` **必须恰好 `1`**，否则入口 init 返回 false → **无条件整包回滚**；
+2. `runtimeApiVersion` **必须精确等于宿主当前 API 版本**，否则入口 init 返回 false →
+   **无条件整包回滚**；
    `TryInitializeRuntimeEntry` 失败（`ModLoader.cs:667-671`）同样是**不设防硬拒**，
    连 `policy="optional"` 都保不住 ⇒ 三个回调必须 try/catch。
+   ⚠️ **这个值是随游戏版本变的，不是固定 1**：**0.29.0 = `1`、0.30.0 = `3`**
+   （见文末「0.30.0 适配」节）。**升级游戏后必须全量改这个值**，
+   且**打包脚本里任何"必须恰好等于 N"的硬编码校验都要放宽**——否则会**静默拒包**
+   （脚本 exit 0、无报错、装进游戏的还是旧包）。拿不准就解包搜
+   `addons/ModEditor/ModSystem/` 里的 API 版本常量。
 3. `provides`/`overrides` **只要有任何非空条目**，包内**每个**被 `InferRuntimeEntry` 识别的文件
    都必须在里面声明（`ModLoader.cs:526/578/673`）——否则该文件被静默跳过 +
    `ValidateManifestRegistrations` 判**整包失败**。所以自定义贴图**必须**写 `provides.Texture`。
@@ -1994,6 +2062,63 @@ lit = re.compile(r"const\s+\w+\s+" + shared_name + r"\s*=\s*([0-9.]+)\s*;")
 
 > 通用教训：任何「源码里必须含某个字面量」的断言都是**重构陷阱** —— 把值搬到别处
 > （共享源 / 常量表 / 配置）后必然假红。搬家时顺手升级断言，**不要删断言或跳过校验**。
+
+## ★ 把一个 Mod 的**部分功能拆分**成独立新包（2026-09-30 实测落地）
+
+需求形态：「把 A Mod 里的功能 X、Y 拿出来单独做一个 Mod，A 里去掉这两个」。
+本项目实例：「手机操作优化」→ 拆出「点击反馈与自动拾取」（③按压反馈 + ④自动拾取开关），
+原包只留 ①滑动误选撤销 / ②误触取消。
+
+**新包要独立，不能与原包撞任何"全局身份"**（全部检查一遍，漏一个就是懒加载/回滚/串味）：
+
+| 要有唯一值的东西 | 本实例 |
+|---|---|
+| `<AssemblyName>`（**安卓硬要求**，见前文「跨平台程序集标识」） | `JTYMobileUXFixes` vs `JTYMobileTapFeedback` |
+| `mod.json` 的 `id` | `mobileuxfixes` vs `mobiletapfeedback` |
+| `runtimeEntryType`（入口类名） | `MobileUXFixesEntry` vs `MobileTapFeedbackEntry` |
+| 日志前缀常量 `P` | `[MobileUXFixes] ` vs `[TapFeedback] ` |
+| `SetMeta(...)` 的 meta 键 | `MUXF_*` vs `MTF_*` |
+| 注入到游戏 UI 的节点名 | `MUXFAutoCollectBox` vs `MTFAutoCollectBox` |
+| `user://` 偏好文件名 | `mobileuxfixes.json` vs `mobiletapfeedback.json` |
+
+* ★ 偏好文件迁移：拆包后**新包要能读到旧包的记录**（否则用户的历史「曾经拥有」丢失）⇒
+  新包把旧路径当**只读**一起查（`RecGetFrom(新) || RecGetFrom(旧)`），写只写新文件。
+* 新包要有自己的 `build_mod.py` / `csproj` / `mod.json`（复制原包再改，见 §标准流程）；
+  装机后**手工把新 id 加进 `Mods/enabled_mods.json`**（照抄原包 install() 那两行）。
+* ★ **工作目录 zip 的打包脚本里也有个"包清单"**（本项目 `mod/_pack_all.py` 的 `WANT`）——
+  加新包时**必须一起改**，否则新包不进 zip（用户拿到包会发现"少了一个"）。
+
+### 裁剪原包：写"带断言的区间删除脚本"，别手删
+
+删上百行时手删必错。做法：python 脚本按**锚点**切区间，每条都带断言：
+
+```python
+CUTS = [("开始锚点", "结束锚点", "说明"), ...]
+for start, end, name in CUTS:
+    a = s.find(start); assert a >= 0 and s.count(start) == 1, name
+    b = s.find(end, a); assert b > a and s.count(end) == 1, name
+    s = s[:a] + s[b:]          # ★ 见下面这个坑
+# 再断言：拆掉的符号 "残留数 == 0"；保留的符号 "出现数 >= 1"；大括号配平
+```
+
+* ⚠️⚠️ **`s[:a] + s[b:]` 与 `s[:a] + 分隔符 + s[b+len(end):]` 都不要写** ——
+  后者会把 `end` 锚点本身**吞掉**（本项目实测：`private Vector2 GetMousePos()` 与
+  `private void Log(string msg)` 两行签名被删，编译才报错）。
+  正确写法：`s[:a] + s[b:]`（把锚点连同区间一起保留 `end` 那段）**或**
+  `s = s[:a] + end + s[b+len(end):]`。**改完必须再跑一遍"签名/括号"自检**：
+  ```python
+  assert s.count("{") == s.count("}") and s.count("(") == s.count(")")
+  for k in ["private void Log(string msg)", ...]: assert s.count(k) == 1
+  ```
+* ⚠️ 「残留数 == 0」的断言里**别用会撞子串的名字**：`_frame` 会命中 `process_frame`、
+  `GetFeature` 会命中 `GetFeatureValue`、`CollectByClassName` 会命中注释里的提及
+  ⇒ 用 `"private int _frame"` / `"int GetFeature("` / `"void CollectByClassName"` 这种带语法的串。
+* 顺手做的两件清理（本项目一起做了）：
+  ① 拆空之后**原包不要再留 15 帧节流**（`if (_frame % 15 == 0)` 整块会变成空的）——连 `_frame` 字段一起删；
+  ② **诊断日志默认关掉**（原包曾为排查 ①③ 长期开着 `EnableLog/DiagVerbose`，
+     功能稳定后拆包是关掉它们的好时机；开关保留、注释写明"排查时置 true 重打包"）。
+* 拆完**必须两边都编译**（本项目：原包 1288→759 行，0 警告 0 错误；
+  新包 0 警告 0 错误），装机后 `enabled_mods.json` 应同时含两个 id。
 
 ## 已知坑
 
@@ -3307,3 +3432,1117 @@ foreach (var c in seedBank.packetList) {
 - `select` 只是**卡面选中框**开关（`Pressed()` 里 `select = !select`），**不代表"已入卡槽"**：
   `PacketListChoose()`（「重新选卡」按钮）/ `PacketChooseFromName()`（关卡预设）都不经过 `Pressed()`。
   "最后选择的植物"的正确来源是 **`seedBank.packetList` 的顺序**（`AddPacket` 追加、`DeletePacket` 移除）。
+
+
+## ★★ 手机端输入的两个时序铁律（滑动撤销 / 点击取消类功能必读，2026-09-30 实测定案）
+
+做"滑动误选撤销""再点一次取消""点击反馈"这类输入补丁时，**两件事必须先确认**，
+否则代码逻辑再对也不生效：
+
+### 铁律 1：卡片是**在"按下"那一刻**就被选中的，不是松手
+`TowerDefenseInGamePacketShow`（卡池/卡槽共用）的选中/捡起发生在**按下**，不是 release。
+⇒ 任何"按下→当前"的位移判定，**在选中被观测到的那一刻位移必然 = 0**，永远判不出滑动。
+
+**取证方式（决定性）**：在窗口输入里把按下/抬起坐标打出来，看"选中被判定时用的终点坐标"
+与"随后的抬起坐标"是否不同 —— 实测日志：
+
+```
+指针按下 vp=493,398
+①卡池卡被按下：… 起点=493,398 终点=493,398      ← 判定发生在按下帧，终点还是按下点
+指针抬起 vp=583,152                              ← 真实手势滑了 200+px
+```
+
+**正确写法**：观测到"刚被选中"时**只登记**（记下起点 + 卡引用 + 截止时间），
+到**抬起事件**里再用 `起点 → 抬起点` 的位移判定；并留一个超时兜底（丢抬起事件时用当前位置结案）。
+```csharp
+// 选中边沿处
+if (curSel && !prevSel) {
+    pendingFrom = _downValid ? _downPos : _lastPos;
+    pendingCard = card; pendingDeadline = Time.GetTicksMsec() + 2000;
+    if (!_pointerDown) Resolve(pendingFrom);   // 万一游戏是松手才选中 ⇒ 立刻结案
+}
+// 抬起事件里
+if (dist >= Threshold && card.select) Undo(card);
+```
+
+### 铁律 2：手机上一次触摸会被**派发两次**
+`InputEventMouseButton` + `InputEventScreenTouch` **成对出现**（Godot 的触摸→鼠标模拟），
+顺序是 `按下(mouse) → 按下(touch) → …` 与 `抬起(mouse) → 抬起(touch)`。
+⇒ 任何"每次抬起都执行一次"的逻辑会**跑两遍**；任何"按下时重置手势状态"的逻辑
+会被第二次按下**清掉**。
+
+* 用 `Window.WindowInput` 采样坐标最稳（窗口层不受节点 ProcessMode 门控）；坐标要用
+  `Root.GetFinalTransform().AffineInverse()` 从窗口像素换成视口坐标。
+* 手势簿记要防抖：`if (!_gestureOpen || now - _lastPressMs > 250) { 记手势起点 }`，
+  抬起时 `_gestureOpen = false`；**执行过一次动作后立刻清掉手势键**，避免第二次抬起再执行。
+
+### 由这两条推出的"再点一次取消"正确判据
+不能只比"上一帧拿起的卡"—— 因为**同一次点击的抬起**也会命中它（卡在按下时已被捡起）
+⇒ 表现为"单击拿不起卡、只有拖走才有效"（抬起点在卡外才躲过）。
+
+正确判据：**本手势"按下之前"手上就已经是这张卡**才算"再点一次"：
+```csharp
+// 按下时（同手势只记一次）
+_pressStartPickId = _prevPickId;      // _prevPickId 是上一帧 process_frame 采样的"当前拿起"
+// 抬起时
+if (_prevPickId != 0 && _pressStartPickId == _prevPickId && 落点在卡内) Cancel();
+```
+
+### ★ 功能定案后**必须把诊断日志关掉**（收尾动作，别忘）
+
+为排查时序问题临时打开的日志（`EnableLog`）**不会自己关**。用户说"功能没问题了/关掉日志"
+就是明确的收尾信号，此时要做的是一整串（本项目 2026-09-30 实操）：
+
+1. `EnableLog = true` → **`false`**（`DiagVerbose` 一并确认为 `false`）；
+2. **同步改注释**，去掉"需要真机再验一轮"这类措辞，改成"真机复验通过后关闭，排查时临时置 true"
+   —— 留着旧注释会让下一次接手的人以为还在排查中，又把日志打开；
+3. 重新 `build_mod.py --install`（编译 + 打包 + 装机），**只做单包，不做全量 zip**（用户会明说）；
+4. 报给用户 **pmod 字节数变化 + 新 DLL md5**（关日志后体积会掉几十字节，属预期）；
+5. 提醒用户**手机端要手动拷新 pmod 覆盖**并确认 `godot.log` 里不再出现该 Mod 的日志前缀行
+   —— 只看 PC 侧编译成功不算验证过（曾出现用户手机上装的是旧版）。
+
+* 日志开关的形态固定为两个 `static readonly bool`：`EnableLog`（正常信息）/ `DiagVerbose`（逐事件），
+  所有输出统一走一个 `Log(string)` 并 `if (!EnableLog) return;`，以及 `try { GD.Print(P + msg); } catch { }`。
+* ★ 拆包/新包时**新包默认关日志**，原包若还有历史日志也一并关掉（见前文「拆分 Mod」一节的清理项）。
+
+---
+
+## ★★★ 0.30.0 适配 + 12 Mod 实机调试全程沉淀（2026-10-11 定案）
+
+> 本节是**跨版本升级**与**大批量 Mod 实机调错**的方法论与硬结论。其中多数坑与版本无关
+> （BCL 裁剪、UI 组件真相、宿主安全模式、构建脚本静默失败），**下次升级/新 Mod 同样适用**。
+
+### 一、★★★ BCL 裁剪极狠：反射几乎全灭 ⇒ **能用编译期直调就别反射**
+
+0.30.0 宿主对 BCL 做了激进裁剪（IL Linker）。实测**下列 API 全部 `MissingMethodException`**：
+
+| API | 状态 | 症状 |
+|---|---|---|
+| `PropertyInfo.SetValue(obj, value)`（**两参**重载） | ❌ 被裁 | **每帧抛异常刷日志**（`LevelQuickJump` 一次启动 18 条） |
+| **`PropertyInfo.get_CanWrite`** | ❌ 被裁 | 写配置/切档失败（`DoubleSpeedToggle`） |
+| **`Type.GetMethod(string, Type[])`** | ❌ 被裁 | 找不到方法 ⇒ 功能**静默不生效** |
+| **`Type.GetMethods()`**（无参重载） | ❌ 被裁 | 同上 |
+| `PropertyInfo.SetValue(obj, value, null)`（**三参**） | ✅ 可用 | —— |
+| `MethodInfo.Invoke` / `FieldInfo.GetValue` / `PropertyInfo.GetValue` / `Type.GetField` / `Type.GetProperty` / `Assembly.GetType` | ✅ 可用 | —— |
+
+**替换表（照抄）**：
+
+```csharp
+// ❌ 两参 SetValue
+prop.SetValue(obj, value);
+// ✅ 三种替代
+prop.GetSetMethod(true)?.Invoke(obj, new object[] { value });   // 首选
+prop.SetMethod?.Invoke(obj, new object[] { value });
+prop.SetValue(obj, value, null);                                // 三参未裁
+
+// ✅ 想判"可写"：不要用 CanWrite
+bool writable = prop.GetSetMethod(true) != null;
+```
+
+### ★★★ 铁律 21：csproj 已 `Reference` 游戏 DLL ⇒ **优先编译期直调**
+
+本技能线下的 Mod csproj 本来就引用了 `PlantsVsZombies.dll`，**游戏类型可以直接写进代码**：
+
+```csharp
+// ✅ 一行解决，零反射（图鉴 Mod 的最终解）
+DialogManager.Instance.DialogCreate("Almanac");
+```
+
+**决策顺序**：① 能编译期直调 → **就直调**；② 仅当"类型可能不存在/跨程序集"时才反射；
+③ 非要反射时，**只用上表"✅ 可用"那几个 API**。
+
+> **血泪**：图鉴按钮为绕开"命名空间不确定"连做 4 轮反射（猜错命名空间 → 换 `GetType("DialogManager")`
+> → 换 `GetMethods()` 遍历）**全部被裁剪挡死**，最后一行直调解决。
+> **反射在这个游戏里是负资产，不是保险绳。**
+
+### 二、★★★ 宿主「安全模式」：强杀游戏 → 下次启动零 Mod 加载
+
+**症状**：某次启动后**所有 Mod 都不生效**，宿主弹「上次 Mod 加载未完成（阶段 `awaiting-main-menu`）。
+当前以零 Mod 安全模式运行」。日志里 `safeMode=True`、`loaded 0 enabled Mod package(s)`。
+
+**根因**：宿主用 `%APPDATA%\Godot\app_userdata\植物大战僵尸杂交版\Mods\mod_boot_journal.json`
+记录加载进度：
+
+```json
+{ "schemaVersion": 1, "planHash": "...", "owner": "", 
+  "phase": "awaiting-main-menu", "inProgress": true, "recoveryRequired": false }
+```
+
+**用 `Stop-Process -Force` 强杀正在加载 Mod 的游戏** ⇒ journal 永远停在
+`phase=awaiting-main-menu` + `inProgress=true` ⇒ **之后每次启动都进安全模式**。
+（删 `config.res` / `save.res` / `enabled_mods.json` 都**没用** —— 标记只在 journal 里。）
+
+**修法**：删 `Mods\mod_boot_journal.json`（宿主会重建）→ 立刻恢复 `14/14`。
+
+**⇒ 重装 Mod 后的固定重启流程（本项目纪律）**：
+
+```
+1. 关游戏（Stop-Process）
+2. 删 Mods\mod_boot_journal.json        ← ★ 最关键
+3. 清 ModsCache\ 全部目录
+4. 删 logs\godot.log（可选，便于看新日志）
+5. 启动游戏
+```
+
+⚠️ **普通玩家（尤其手机端）遇到安全模式无法自救**（不知道要删隐藏文件）——
+这是**宿主设计缺陷**，应向作者提 Issue：journal 超时自动清除 / 提供"重试"入口。
+**Mod 侧无法自解**：安全模式在 Mod 代码被加载**之前**就生效，`overrides` 也覆盖不到 `user://` 文件。
+
+### 三、★★★ UI 组件真相（别再按名字猜）
+
+| 组件 | 真相 |
+|---|---|
+| **`MainButton.tscn`** | 根节点是 **`TextureButton`**（不是 `Button`）⇒ `scene.Instantiate() as Button` **永远 null**（会静默退化成纯 `Button`，**外观全错**）。正确：`as BaseButton` |
+| **`MainButton` 的文字** | 走 **`[Export] public string text`** 属性（**默认值就是 `"Test"`** —— 场景里那个诡异的 "Test" 就是它）。`_Ready()` 与 **每次 `RefreshLayout()`** 都会 `label.Text = _text` ⇒ **直接改子 `Label` 会被覆盖回 "Test"** |
+| **`DialogManager`** | **全局命名空间**（`[GlobalClass] public partial class DialogManager`，**无 namespace**）；`DialogCreate(string dialogName, Dictionary data = null)` 是**两参**方法（第二参有默认值） |
+| **`LevelChoose.Select(int id)`** | 既选章节也选关卡，且**会写 `Global.currentLevelId = id`** |
+| **`Tree.SetSelected`** | Godot 4 签名是 `(TreeItem, int column)` —— **不是 bool**！写 `SetSelected(item, true)` 报 `CS1503 无法从 bool 转为 int` |
+| **`Godot.Collections.Dictionary`** | **不是 `GodotObject`** ⇒ `IsInstanceValid(dict)` 直接 `CS1503` |
+
+**设置面板扩展 `MainButton` 的写法（照抄）**：
+
+```csharp
+PackedScene scene = GD.Load<PackedScene>("res://Prefab/GUI/Button/MainButton.tscn");
+BaseButton btn = scene?.Instantiate() as BaseButton;      // ★ BaseButton 不是 Button
+btn.GetType().GetProperty("text")?.GetSetMethod(true)
+   ?.Invoke(btn, new object[] { "图鉴" });                 // ★ 走 text 属性，别改子 Label
+```
+
+### 四、★★★ 战斗选卡栏（SeedBank）结构真相
+
+`Registry/Battle/Feature/SeedBank/Control/TowerDefenseInGameSeedBank`：
+
+| 事实 | 说明 |
+|---|---|
+| **类名 ≠ 节点名** | 按**节点名** `FindChild("TowerDefenseInGamePacketBank")` 找不到任何东西 ⇒ **必须按类型名递归找**（`n.GetType().Name == "TowerDefenseInGameSeedBank"`） |
+| **`packetList` 只含「已入槽」的卡** | **不是全部槽位**！选卡阶段只有玩家已选的几张在列 ⇒ 想给"全部 16 个槽"挂东西**不能只遍历 `packetList`** |
+| **空槽是另一个类型** | `TowerDefenseInGamePacketSlot`（占位）/ 有卡的是 `TowerDefenseInGamePacketShow` |
+| **卡槽在横/竖容器间 Reparent** | `packetContainer` 字段**指向当前激活容器**（`pcPacketContainer` / `mobilePacketContainer`），切换时把**同一批槽节点 `Reparent`** 过去 ⇒ 节点身份不变、父容器变 |
+| **铲子不在 SeedBank 子树** | `ShovelPickTool` 在 `TowerDefenseBattleFeatureShovel` 下 ⇒ 从 SeedBank 往下找**永远找不到**（要用"战斗场景根"或向上找的 `FindBattleRoot`） |
+| ⚠️ **全树找铲子的副作用** | 从 `_tree.Root` 找会抓到**别的场景**的铲子节点 ⇒ 标签挂到屏幕左上角（用户报"我的铲子怎么到左上角了"） |
+
+**⇒ 「给所有卡槽挂东西」的正确收集口径（三路并集）**：
+
+```csharp
+// packetList（已入槽） ∪ 当前激活容器直接子节点 ∪ PC/Mobile 两分支递归
+Action<IEnumerable> collect = seq => { foreach (var it in seq) { ... 类型名匹配后去重加入 ... } };
+collect(seq);                                   // packetList
+collect((bank.GetType().GetField("packetContainer")?.GetValue(bank) as Node)?.GetChildren());
+CollectSlotChildren(pcControl, slots, seen);    // 递归两分支
+CollectSlotChildren(mobileControl, slots, seen);
+```
+
+### 五、★★★ UI 挂载位置与点击「被裁剪」
+
+**症状**：按钮**看得见**但**点不动**（`Pressed` 从不触发，日志里连"被点击"都没有）。
+
+**根因**：把按钮挂在某个 `Control`（如墓碑 `DialogMenu`，423×498）**内部**，
+但坐标设在**该矩形之外**（如 x=425）⇒ Godot 的 GUI 命中检测按父控件矩形**裁剪**
+⇒ 鼠标事件到不了它。
+
+**两条解法（按优先级）**：
+
+| 方案 | 做法 | 备注 |
+|---|---|---|
+| **A（推荐）** | 挂在**目标控件内部、矩形之内的位置**（如"按钮列表正上方"） | 位置用**相对父控件的 `Position`**，不要用 `GlobalPosition` 反推 |
+| B | 挂到全屏层（`Layer/Control` 或 `CanvasLayer`） | ⚠️ 此时**不能用 `GlobalPosition` 定位**——CanvasLayer 有独立变换，会算错方向（用户报"按钮跑到左上角"） |
+
+**教训**：`GlobalPosition` 只在**同一个 canvas 层级**内可靠；跨 `CanvasLayer` 要用
+`GetGlobalTransformWithCanvas()` 自己乘。
+
+### 六、宿主设置（`XWModSettings`）API 速查
+
+| 项 | 事实 |
+|---|---|
+| 读值 | **一律 `Get<object>(key)` 再转换**（`Get<T>` 类型不符会抛 `InvalidCastException`；缺键抛 `KeyNotFoundException`）。实际类型可能是 `bool` / `long` / `string` / `System.Text.Json.JsonElement` |
+| `applyMode` | **默认 `"restart"`**（需重启才生效）⇒ 纯数据类（坐标/字号/开关/快捷键）**必须显式写 `"immediate"`** |
+| `affectsGameplay` | **默认 `true`** ⇒ 非玩法项要显式写 `false` |
+| 合法 `type` | `bool / int / float / string / enum / multienum / text / richtext / color` |
+| **没有图片类型** | `text`/`richtext` 是**只读展示**（`IsDisplay`）⇒ **配置页无法显示图片**（"演示图"需求只能改文字+链接） |
+| 联动 | `visibleWhen` / `enabledWhen` 用 `{key, op, value}`；`multienum` 用 `minSelected`/`maxSelected` |
+| 离线闸门 | 改 `settings` 前**必跑**本技能线的 `settings-validate`（反射调宿主 `XWModSettingsService.ValidateDefinitions`） |
+
+### 七、★★★ 构建链路的「静默失败」——最贵的一类坑
+
+**本轮回溯发现 3 处，若不修，前面所有改造都只是改了源码、根本没进游戏包**：
+
+| # | 坑 | 症状 | 修法 |
+|---|---|---|---|
+| 1 | 打包脚本**硬编码** `runtimeApiVersion != 1 → 拒包` | 0.30.0 要求 **3** ⇒ 6 个 Mod **静默不更新**（脚本 exit 0 但包是旧的） | 放宽为 `isinstance(int) and >= 1` |
+| 2 | `build_mod.py` 每次构建**重写 `mod.json`** | P1 统一元信息（作者/主页/更新历史）**构建即回退** | 加 `_merged_manifest()` 合并层，保留 5 个字段 |
+| 3 | 构建脚本**只编译不复制** DLL | `bin/Release/*.dll` 是新的、`Runtime/ModAssembly.dll` 是旧的 ⇒ 三件套报"DLL 比源码旧"、装机跑的还是老逻辑 | 手动 `cp bin/Release/*.dll → Runtime/ModAssembly.dll` 再 `build_pmod.py` |
+
+**纪律**：
+- 打包脚本里**任何"版本/字段不匹配就拒绝"的硬编码校验，都要当成定时炸弹**——
+  升级时会**静默失效**（exit 0、无报错、包是旧的）。
+- **`--install` 会把该 Mod 重新写进 `enabled_mods.json`** ⇒ 要"停用某 Mod"时，
+  **跑完构建必须再删一次启用项**（本项目 MobileUXFixes 被反复重新启用过）。
+- **改 `mod.json` 的默认值后必须重建该 Mod**（装机包里是打包时的快照）。
+- 每轮收尾**必须跑三件套**：编译（DLL 新于源码）/ 打包（dist 时间与字节）/ 装机（`sha256(dist) == sha256(装机)`）+ 包内容（version/author/API/入口/配置项数）。
+
+### 八、测试纪律（用户明确要求，本项目全程遵守）
+
+1. **「所有目标完成前先别启动游戏」** —— 用户会在能测时才说可以；
+2. **「没改好之前不要开游戏」** —— 顺序固定：改 → 闸门 → 构建 → 三件套 exit 0 →
+   清 journal/缓存 → 才启动；
+3. 用户测完会给**截图 + 现象描述**；**第一现场永远是 `godot.log`**（日志默认全开）：
+   ```powershell
+   Get-Content "$ud\logs\godot.log" | Select-String 'ModName|失败|Exception|WARN'
+   ```
+4. 日志里 `MissingMethodException` ⇒ **立刻想到裁剪**（见本节第一条），别再试别的反射写法；
+5. 汇报用**表格**：「问题 / 根因 / 修复」+「请验证 X / Y / Z」，别写长文（用户会累）。
+
+### 九、跨版本适配的最小清单（下次升级照做）
+
+| 项 | 0.29.0 | 0.30.0 |
+|---|---|---|
+| `runtimeApiVersion` | **1** | **3** |
+| 打包脚本校验 | —— | 放宽为 `>= 1`，否则静默拒包 |
+| `mod_boot_journal.json` | 无 | **新增**：强杀会触发安全模式 |
+| BCL 裁剪程度 | 未知 | **极狠**（见第一条表） |
+
+**升级动作**：① 全 Mod 改 `runtimeApiVersion` → ② 全量重建并**逐个三件套**（防静默失败）
+→ ③ 清 `ModsCache` + `mod_boot_journal.json` → ④ 启动看 `loaded N/N enabled` 且 `safeMode=False`
+→ ⑤ 再进游戏逐功能验收。
+
+---
+
+## ★★★ 宿主配置体系（`XWModSettings` + 配置页 UI）实机调试沉淀（2026-10-11/12 定案）
+
+> 本节的每一个坑都是**实机拉锯十几轮**换来的。做任何"跟着配置项走"的 Mod 之前先读这一节，
+> 能省掉「配置改了不生效 / 面板保存弹红字 / 点按钮弹出别的 Mod 面板」这一整类返工。
+
+### 一、★★★ 最大的一类坑：「配置改了、保存了，游戏里不生效」
+
+**根因**：Mod 只在 `Initialize` 里读一次设置，**没有订阅 `Settings.Changed`**。
+宿主的保存流程是「落盘 → Apply → 发 `Changed` 事件」，Mod 不听事件就永远不会重读
+⇒ 表现为「必须重启游戏才生效」。本项目 13 个入口里 **5 个缺失订阅**，
+全都在用户那里表现为「改了配置没反应」。
+
+**标准模板（照抄）**：
+
+```csharp
+private XWModRuntimeContext _context;
+private bool _settingsSubscribed;
+
+public void Initialize(XWModRuntimeContext context)
+{
+    _context = context;              // ★ 必须存下来，事件回调里要用
+    ReadAllSettings(context);        // 已有的读取逻辑
+    try
+    {
+        if (context?.Settings != null && !_settingsSubscribed)
+        {
+            context.Settings.Changed += OnSettingsChanged;
+            _settingsSubscribed = true;
+        }
+    }
+    catch { }
+}
+
+/// <summary>配置保存后重读；重读后要"立即生效"的项在这里同步。</summary>
+private void OnSettingsChanged(IReadOnlyList<string> keys)
+{
+    try
+    {
+        ReadAllSettings(_context);
+        // 例：把新值推到运行时 UI / 场上实例
+        Log("配置已更新，已重读。");
+    }
+    catch { }
+}
+```
+
+* `context.Settings` 就是 `XWModSettingsService.GetActive(ModId)` 的**单例**（`XWModRuntimeContext`
+  构造时取一次），**与配置页保存的那份是同一实例** ⇒ 订阅有效。
+* **排查手法**：全 Mod `grep "Changed +="` —— 有订阅的才可能热生效。
+* 常见遗漏：订阅写在了 `OnAllModsLoaded` 里而 `_context` 是 null（要先存 `_context`）；
+  或写了订阅但 `catch { }` 把异常吞了（失败没有任何痕迹）。
+
+### 二、★★★ 但**不要依赖 `Settings.Changed` 做状态同步**——它有三个静默失效条件
+
+宿主的 Apply 只在下面三条**全部满足**时才发 `Changed`：
+
+1. `active.PackageSha256 == editor.PackageSha256`
+   （**重装过 Mod 而配置页没重开 ⇒ 哈希不一致 ⇒ 不发**）
+2. 值**确实变了**（`ValuesEqual` 判等）
+3. 该项 `applyMode == "immediate"`
+
+任一不满足就**静默不发**（不报错、不打日志）。
+
+⇒ **凡"必须与配置保持一致"的运行时状态，一律每帧轮询 settings 对齐**
+（`Settings.Get` 是内存字典读取，开销可忽略）：
+
+```csharp
+private void OnProcessFrame()
+{
+    try { CheckStyleSync(); } catch { }   // 读 settings 的 style ↔ 当前枚举，不一致 ⇒ 拆旧控件重建
+}
+```
+
+**本项目实证**：三倍加速的「样式热更新」——
+v1.4.3（订阅 Changed + 拆 `_box`）**实测无效** → v1.4.4（加拆 `_sel`）**仍无效**
+→ **v1.4.6 改每帧对齐**才真正生效。
+**结论：轮询是稳的，事件是脆的。**（与"每帧维持时停""每帧校正"同一设计哲学。）
+
+### 三、★★★ 改键 / 录制面板的「保存」必须走宿主保存管道，**不能直接 `TrySave`**
+
+宿主保存链：`SavePlayerSettings()` → 读**所有** reader（`() => 控件值`）→ 写进 `Draft` →
+若 `CanSave` → `TrySave` → `Apply` → **基线对齐**。
+而 `TrySave` 会**校验 fingerprint**：若 Mod 在配置页打开期间自己调 `TrySave` 改了数据，
+宿主的保存会被拒 **「配置已被其他操作修改，请重新打开菜单。」**，Draft 残留脏
+⇒ 关页时还会弹「放弃未保存的修改?」。
+
+⇒ **面板保存的正确姿势（双路径）**：
+
+| 场景 | 路径 |
+|---|---|
+| **配置页开着**（能找到锚点 `Reset_<key>`） | ① 把新值**写进配置页控件**（enum → `OptionButton.Select(idx)`；string → `LineEdit.Text = ...`；bool → `CheckBox.ButtonPressed = ...`）② **触发宿主保存按钮**：`FindNode("SaveSettings").EmitSignal(BaseButton.SignalName.Pressed)` |
+| **配置页没开**（战斗中呼出面板） | 直接 `TrySave`（无 UI 冲突、fingerprint 安全） |
+
+判定条件：`FindByName(root, "Reset_" + targetKey) != null`。
+
+⚠️ **触发宿主保存按钮时不要检查 `Disabled`** —— 我们写的是控件值、宿主的 `Draft` 并未感知，
+所以保存按钮**必然处于 Disabled**；`EmitSignal(Pressed)` 会直接走到回调里，
+宿主 reader 读到新值 → `Draft` 有变化 → `CanSave = true` → 正常保存 + 基线对齐。
+（早期版本加了 `if (!b.Disabled)` 判断 ⇒ 永远不触发 ⇒ 保存链断开。）
+
+⚠️ **宿主的 `CanSave` 依赖 Draft 差异**：只把值写进控件、不触发宿主保存按钮是**不会落盘**的
+（Draft 仍是页面打开时的快照 ⇒ `CanSave=false` ⇒ 直接 return）。这是"写了 UI 但没保存"的坑。
+
+### 四、★★★ 配置页 UI 的内部结构（注入按钮 / 同步控件全靠它）
+
+`XWModToolsPanel.AddPlayerSettingsField` 生成的**实际层级**（实测）：
+
+```
+line(VBoxContainer)
+└─ hBoxContainer4(HBoxContainer)
+   ├─ vBoxContainer5(VBoxContainer) ─→ field ─→ 【控件本体】(OptionButton / LineEdit / CheckBox …)
+   └─ reset(Button, Name = "Reset_<settingKey>")     ← ★ 与控件在同一个 hBoxContainer4 子树内
+```
+
+| 用途 | 节点名 |
+|---|---|
+| **注入锚点** | `Reset_<settingKey>`（只有**声明了该配置项**的 Mod 配置页才有） |
+| 找同行的控件 | 从 `reset.GetParent()`（hBoxContainer4）**往下递归**找 `OptionButton` / `LineEdit` / `CheckBox` |
+| **宿主保存按钮** | `SaveSettings` |
+| **关于页富文本** | `Content_<settingKey>`（如 `Content_aboutAuthor`）—— Mod 归属判定用 |
+| 值 ↔ 控件映射 | `_playerSettingsReaders[key] = () => 控件值` / `_playerSettingsWriters[key] = v => 控件值 = v`（**都是私有**，Mod 无法调用 ⇒ 只能直接操作控件） |
+
+### 五、★★★ `Reset_<key>` 锚点**不唯一** ⇒ 注入前必须做「归属校验」
+
+**症状**：在 **CD Mod** 的配置页点「录制快捷键」，弹出的却是 **时停** 的录制面板。
+
+**根因**：`toggleHotkey` 这类配置项**多个 Mod 都声明** ⇒ `Reset_toggleHotkey` 在多个配置页同时存在
+⇒ 后注入的按钮覆盖先注入的闭包 ⇒ 串线。
+
+**修法**：注入前沿祖先链找本页关于栏富文本，校验文本以**本 Mod 名**开头：
+
+```csharp
+private static bool PageBelongsTo(Node root, Node reset, string modName)
+{
+    Node cur = reset;
+    while (cur != null && GodotObject.IsInstanceValid(cur))
+    {
+        Node about = FindByName(cur, "Content_aboutAuthor");
+        if (about is RichTextLabel rtl)
+            return (rtl.Text ?? "").TrimStart().StartsWith(modName, StringComparison.Ordinal);
+        cur = cur.GetParent();
+    }
+    return false;
+}
+```
+
+（同理：**赞助二维码注入器**若扫描所有 `Content_aboutAuthor` 注入，会在多个配置页各贴一张 ⇒
+"显示了几个二维码"。必须用同一套归属校验限制在**自己的**配置页。）
+
+### 六、★★★ 劫持原生控件回调做「模式切换」：**不要用事件 `-=` / `+=` 摘挂**
+
+`PacketCategoryButton.OnChoose` 是**事件（多播）**。用「`-=` 摘旧闭包 + `+=` 挂新闭包」
+做模式切换时，若控件被反复创建/订阅（本项目 `EnsureButton` 每次换关卡都可能再订阅一个闭包）
+⇒ **摘一个剩 N 个** ⇒ 点一次弹 N 个面板 / 行为错乱 / 「点了没反应」。
+
+**只有两种稳的做法**：
+
+1. **固定桥接委托 + 布尔分发**（只订阅一次，模式切换只改状态字段）：
+
+```csharp
+t.ChooseHandler = category =>
+{
+    if (t.ModMode) { ToggleFor(t); }              // 本 Mod 面板
+    else           { HandleChooseVanilla(category); }  // 原生行为
+};
+btn.OnChoose += t.ChooseHandler;      // ← 全生命周期只此一次
+```
+
+2. 若两种模式的差别只是"显示/隐藏自己的控件"，**直接控制自己控件的 `Visible`**，**不碰原生事件**
+   （本项目最终定案：藏掉自己的按钮 = 纯原生体验；控制自己控件是唯一不会错乱的做法）。
+
+⚠️ 反面教材演进（本项目 4 轮）：
+「事件摘挂」✗（多播残留）→「隐藏按钮」✗（理解错了需求：用户要的是**点击走原生**，不是按钮消失）
+→「固定桥接 + 布尔分发」✓。
+
+### 七、★★★ 「假修复」——构建成功 **≠** 代码进去了（本项目最贵的一次失误）
+
+用 python 脚本批量改源码时，**`assert old in txt` 失败被外层 `except` 吞掉**，
+但**构建照样 RC=0**（旧代码本身没有引用错误）⇒ 连续两轮汇报"已修复"，
+实际**源文件一个字没改**，用户实测无变化后怒斥"改了个寂寞"。
+
+⇒ **铁律**：
+
+1. 改代码的脚本**不许吞异常**；断言失败必须 `exit ≠ 0`；
+2. 改完**立即 `grep` 关键标识符**（新方法名 / 新字段名）确认真的在源文件里
+   —— `grep -c "新方法名" X.cs` 必须 ≥ 1；
+3. **装机包也要验**：解包 pmod 搜字符串（`zipfile` + **UTF-8 搜方法名 / UTF-16 搜字符串字面量**）；
+4. **汇报"已修复"之前必须完成上述两步**；只跑构建不算验证。
+
+**同类陷阱（同一元凶：验证口径不对）**：
+批量"精简 Mod 描述"脚本按 `\n` 切分历史行，但 `mod.json` 的 `description` 是**单行**、
+历史以「**。vN.N.N：**」**内联**在同一段里 ⇒ 脚本空转 14 次却每轮打印 `ok`，
+用户看到的还是长篇大论。**修法**：按正则 `。v\d+\.\d+` 截断，并且**改完必须重建该 Mod 的 pmod**
+（ModsCache 读的是**装机包里的快照**，只改工作区文件不生效）。
+
+### 八、★ 反射失败的**确切症状**（配合前文「BCL 裁剪表 / 铁律 21」看）
+
+前文裁剪表已列 `PropertyInfo.get_CanWrite` ❌ 被裁；这里补**你在日志里会看到的确切字样**，
+一眼就能对上号，不用再猜：
+
+```
+切档失败：Method not found: 'Boolean System.Reflection.PropertyInfo.get_CanWrite()'
+```
+
+**本项目实例**：`DoubleSpeedToggle` 的切档函数用反射写 `Global.TimeScale`，且先判 `p.CanWrite`
+⇒ 判可写那一步就抛 ⇒ **所有档位切换全部失效**，症状是"1 档→3 档没反应"、
+"2 档→3 档播了取消加速音效却回到 1 档速度"（因为 `SetVanillaPressed` 那步先执行了、TimeScale 没写成功）。
+
+**修法**：`Global.TimeScale` 是 `public static double` ⇒ **编译期直调一行解决**：
+
+```csharp
+Global.TimeScale = want;      // ✅ 替代整段 PropertyInfo 反射
+```
+
+⇒ 日志里出现 `Method not found: '...get_CanWrite()'` / `get_CanWrite` ⇒ **立刻按铁律 21 改编译期直调**，
+别再试 `SetMethod` / `GetSetMethod` 那一串（能直调就别绕）。
+
+### 九、★★ Godot 集合与资源的硬事实（写一次记一辈子）
+
+| 事实 | 正确写法 |
+|---|---|
+| `Godot.Collections.Dictionary` 的遍历 | `foreach (KeyValuePair<Variant, Variant> kv in dict)` —— **不能**写成 `KeyValuePair<string, Godot.Collections.Array>`（CS0030 无法转换）；取值 `kv.Key.AsString()` / `kv.Value.As<T>()` |
+| `Godot.Collections.Dictionary` **不是 `GodotObject`** | `IsInstanceValid(dict)` → **CS1503** |
+| **`TowerDefensePacketBankData` 是 `Resource`，不是 `Node`** | 树扫描（`FindChild` / 递归 `GetChildren`）**永远找不到**；正确取法 = `TowerDefenseManager.Instance.GetPacketBankFeature()?.packetBankData` |
+| `Dictionary<K,V>.GetValueOrDefault`（.NET） | 在本环境不可用（Godot 的扩展方法只对 `Godot.Collections.Dictionary` 生效）⇒ 一律 `TryGetValue` |
+| `System.Linq`（`OrderBy` 等） | 未必可用（BCL 裁剪）⇒ 用 `List.Sort(comparison)` 自己写比较器 |
+| **卡池注入的副作用** | 往 `pb.category` 写自定义键（如 `WCC_*`）后，**游戏原生分类下拉会枚举字典的全部键** ⇒ 不想让玩家看到就**必须清理**（只在自己的模式注入 / 退出时移除 / 切换时清掉旧键） |
+| 节点查找 | `pb.category` 之外，**按节点名找不到时用类型名递归找**（本项目 SeedBank 的类名 ≠ 节点名） |
+
+### 十、★★ 关卡解锁数据的真实位置（做「按获取关卡 / 章节」分类必读）
+
+白卡植物的**获取关卡不在导出的 xlsx 表格里**（表格只有标签/费用/冷却/组件依据），
+而在每个植物的 packet 资源里：
+
+```
+Asset/Anime/Character/Plant/Chapter*/<名>/Packet/<Key>.tres
+  [ext_resource type="Script" path="res://Resource/UnlockCondition/UnlockConditionLevelFinishConfig.cs"]
+  levelSaveKey = "Level1_15"                       ← ★ 通关该关解锁
+  unlockCheckList = [SubResource("Resource_xxxx")]
+```
+
+* **初始解锁**的植物**没有 `levelSaveKey`**（或缺 `unlockCheckList`）。
+* 批量提取：`Asset/Config/Save/TowerDefensePacketInit.json` 里值为 **`false`** 的 `Plant*`
+  就是"初始未解锁"的候选池，再去对应 `.tres` 抠 `levelSaveKey`
+  （本项目一次提取 **187/188** 成功，无缺失）。
+* 解析成「章节」：`Level{chapter}_{stage}` → 第 N 章；`HybridPark_Level*` / `Survival*` /
+  空值 ⇒ 归入「**其他**」。
+* 落地为"分类筛选"时**复用宿主既有链路**：把该章的白卡列表写进
+  `pb.category["<前缀>Chapter_<N>"]`，再调 `CategoryChoose(key)` —— 不必自己重排卡池。
+
+### 十一、★★ 两条输入路径 ⇒ 视觉刷新必须挂在**汇聚点**，不是其中一条
+
+时停 Mod：「按钮 `Toggled`」与「快捷键轮询」**共用入口** `OnTimeStopToggled`，
+但**视觉刷新**（`UpdateButtonVisual()` 红/绿 + `SyncCheckBoxState()` 勾选态）只写在按钮那条链上
+⇒ 用快捷键切换时**功能生效但复选框/按钮显示不更新**（用户实测）。
+
+⇒ 把刷新放进 `Engage()` / `Disengage()` —— **两条路径的汇聚点**，而不是某一条路径的分支里。
+
+### 十二、★★ 过关 / 失败 / 离开关卡要重置运行时状态（下降沿检测）
+
+「三倍加速」的档位是 Mod 自己的状态，游戏过关/失败/退出时没人重置
+⇒ 下关进来自动恢复上关的加速（用户报"过关不重置加速级别"）。
+
+**修法**：每帧维护 `_wasRunning`，检测「战斗运行中 → 非运行」的**下降沿** ⇒
+重置档位 + 还原 TimeScale + 同步 UI：
+
+```csharp
+if (!IsGameRunning())
+{
+    if (_wasRunning) { _wasRunning = false; /* 重置档位/TimeScale/UI */ }
+    return;
+}
+_wasRunning = true;
+```
+
+### 十三、★★ 自己写的 `user://*.cfg` 会**压过** Mod 配置（排查"配置不生效"必查项）
+
+某些 Mod 会把"玩家在面板里手点过"的值存进 `user://Xxx.cfg`，
+若读取顺序是 `Mod 配置 → cfg`，则 **cfg 优先** ⇒ 玩家在 Mod 配置页改默认值"不生效"。
+
+⇒ **排查顺序**：先看 `user://`（`%APPDATA%\Godot\app_userdata\植物大战僵尸杂交版\`）下
+有没有同名 cfg。同时注意这是**合理设计**（手动操作 > 默认值）——
+不要盲目反转优先级，**问清用户期望**再动。
+
+### 十四、★ 先核对"测试场景"，再改代码
+
+「点按钮走原生分类」这条逻辑只在**选卡界面（战斗内）**有意义；
+用户在 **Mod 管理界面**点那个按钮**必然"没反应"**（此时 `currentControl == null`，
+Feature 取不到）。收到"点了没反应"时：
+① 先确认**当时在哪个界面** → ② 再查 `godot.log` → ③ 才动代码。
+
+### 十五、★★ 共享组件文件（`<Compile Include="..\..\X.cs" Link="X.cs"/>`）改动**不触发增量重编译**
+
+多个 Mod 通过 csproj 链接共享同一份 `.cs`（本项目：`KeybindPanelManager.cs` /
+`SponsorQrInjector.cs` / `QrCodeBitmap.cs`）时，**改共享文件本身不会让各 Mod 重新编译**
+（MSBuild 只看各 Mod 自己目录里的文件时间戳）。
+
+⇒ **纪律**：改完共享文件，**必须 `touch` 每个依赖 Mod 的 `*Entry.cs`，再逐个重建**，
+否则装机跑的还是旧逻辑（"明明改了却没效果"的隐蔽元凶之一）。
+
+### 十六、★ 交付前的收尾清单（本项目实战）
+
+1. **改 `mod.json` 任何字段后必须重建该 Mod**（装机包里是打包时的快照，
+   ModsCache 解出来的也是包内那份 ⇒ 只改工作区文件玩家看不到）；
+2. **`description` 要"一句话介绍"**：单行文本，历史以「。vN.N.N：」内联 ⇒
+   正则截断 + 重建 + **解包装机包终验**；
+3. **诊断日志定案后关闭**（或降级为"仅状态变化时打印"，避免刷屏）；
+4. **收尾三件套**：编译（DLL 新于源码）/ 打包（dist 字节）/ 装机（`sha256(dist) == sha256(装机)`）
+   + 包内容抽查（version / 配置项数 / 关键方法名字符串）；
+5. **重启流程**：关游戏 → 删 `Mods\mod_boot_journal.json` → 清 `ModsCache\*`
+   → 启动 → 看日志 `enabled runtime apply complete: N/N; safeMode=False`。
+
+### 十七、★ 本技能有**两份副本**——改完必须同步（否则交付包里是旧技能）
+
+| 副本 | 路径 | 作用 |
+|---|---|---|
+| **生效副本**（harness 读这份） | `%USERPROFILE%\.dsh\skills\pvz-hybrid-mod-authoring\SKILL.md` | 新会话加载的技能内容 |
+| **仓库副本**（交付用） | `<工程>\pvz-hybrid-mod-skills\skills\pvz-hybrid-mod-authoring\SKILL.md` | 「全量包」zip 里带的技能仓库 |
+
+两者**不是符号链接**，各自独立 ⇒ 只改一份会导致「本次会话学到的东西下次加载不到」
+或「交付给用户的 zip 里是旧技能」。
+⇒ **改动一条纪律**：改完任一份，立刻 `cp` 覆盖另一份并核对字节数一致
+（本项目 2026-10-12 发现仓库副本落后了一整个大节，即此坑）。
+
+
+---
+
+## ★★★ 手机端 / 输入设备适配 + 实例级新坑（2026-10-12 本轮回溯定案）
+
+> 本节补齐三块：**① 手机端为什么会"功能全废"**（配置页与输入都要按平台分流）、
+> **② 实例级新坑清单**（每条都带源码行号与"我是怎么确认的"）、
+> **③ 一套可复用的「记录本 + 独立复核」工作法**。
+> 这些坑多数与版本无关，做任何**带配置/带输入/带动态数值**的 Mod 都会遇到。
+
+### 十八、★★★ 手机端（Android/iOS）必须单独适配 —— 检测方法就一行
+
+宿主**没有**现成的"是不是手机"配置项给你用，但 Godot 侧判据稳定：
+
+```csharp
+internal static bool IsMobileInput()
+{
+    try
+    {
+        return OS.HasFeature("mobile")
+            || OS.GetName() == "Android"
+            || OS.GetName() == "iOS";
+    }
+    catch { return false; }
+}
+```
+
+**为什么必须分平台**：手机没有物理键盘 ⇒ **PC 那一整套按键下拉是废的**（点了也没法按出字母）。
+用户原话：「能不能检测是手机端，如果是，就去掉 PC 端按键选择，只有音量相关的按键选择绑定」。
+同理：**`PlayerPrefs` 式"按住某键"的功能、多键组合、F1~F12 快捷键在手机上通通无意义**
+（本项目在手机上唯一可用的物理键 = **音量+ / 音量- / 静音**）。
+
+#### 十八-1 ★★★ 关键：**只能"隐藏"宿主的下拉，绝不能"重建/删项"来过滤**
+
+宿主 enum 读取器是**按索引**取值（`XWModToolsPanel.cs:4979`）：
+
+```csharp
+choice.AddItem(string.IsNullOrWhiteSpace(option.Label) ? option.Value : option.Label);   // 项文本 = label
+...
+_playerSettingsReaders[key] = () => definition.Options[choice.Selected].Value;            // ★ 按索引映射回宿主数组
+```
+
+⇒ 你若为了"只留音量键"而 `Clear()` + `AddItem("手机音量+")`，宿主读到的是
+`definition.Options[0].Value`（= 选项表第 0 项，通常是 `""` 或 `A`）⇒ **保存下来的是别的值**，
+而且**不报错**（静默写错）。
+
+**正确做法**：把那个 `OptionButton` **`Visible = false`**（纯视觉隐藏，索引与宿主数组仍然一一对应），
+功能改由**自己的录制按钮**承担，并把当前绑定写进按钮文字：
+
+```csharp
+OptionButton ob = FindOptionButton(row);
+if (ob != null && ob.Visible) { ob.Visible = false; }        // ★ 隐藏，不是重建
+btn.Text = "录制快捷键（当前：" + LabelOf(currentDisplay) + "）";
+```
+
+#### 十八-2 ★★★ 播放"取消/录制"这类交互时，手机端要**限定可接受的键**
+
+手机端 UI 上没有键盘，用户只能按音量键 ⇒ 录制回调里直接过滤：
+
+```csharp
+if (IsMobileInput() && !IsVolumeKey(k) && k != Key.Escape)
+{
+    _tree.Root.SetInputAsHandled();
+    GD.Print("[KeybindPanel] 手机端只支持音量键，已忽略：" + (KeyToString(k) ?? "?"));
+    RefreshHint();      // 保持录制态，并当场告诉用户"只能按音量键"
+    return;
+}
+```
+
+**要点**：① 不要"静默忽略"（用户会以为面板卡死），要**保持录制态 + 提示**；
+② `Esc` 仍要放行（取消录制）；③ 提示文案也要分平台（PC 说"按下任意按键"，手机说"按音量+/-/静音"）。
+
+### 十九、★★★ 键名映射：**配置值 = Godot 枚举名 or 选项拼写？** —— 必须逐字对齐
+
+#### 十九-1 音量键：Godot 是 **`Volumeup`（小写 u）**，而人写选项爱写 `VolumeUp`
+
+**症状**（用户实测日志）：
+
+```
+[KeybindPanel] 录到键：Volumeup（点「保存」生效）
+WARNING: [DoubleSpeedToggle] 快捷键保存失败：配置 'hotkeyNext' 的值无效。
+```
+
+**两处证据**：
+1. `GodotSharp.dll` 里只有 `Volumeup` / `Volumedown` / `Volumemute`（**没有** `VolumeUp`）——
+   用 Python 直接扫 DLL 字节即可确认（元数据字符串是 UTF-8）：
+   ```python
+   b = open("data_PlantsVsZombies_windows_x86_64/GodotSharp.dll","rb").read()
+   print("Volumeup" in str(b), "VolumeUp" in str(b))
+   ```
+2. **宿主会拿这个字符串去校验 `mod.json` 的 options**：
+   `XWModSettingsService.TryValue()` 比对不上 ⇒ `TrySave` 失败 ⇒
+   **`result.Message` 就是那句「配置 'hotkeyNext' 的值无效」**。
+   ⚠️ 这条**不抛异常、不崩**，只写一行 WARNING ⇒ 很容易被当成"功能没生效"而不是"保存被拒"。
+
+**修法（唯一真源）**：`Key → 配置串` 的函数要**显式处理**这几个特例，
+其余走枚举名，字母数字走字符：
+
+```csharp
+internal static string KeyToString(Key k)
+{
+    if (k == Key.None) { return ""; }                       // ★ 空串 = 「无绑定」选项，别写 "None" 字面量
+    int code = (int)k;
+    if ((code >= 'A' && code <= 'Z') || (code >= '0' && code <= '9')) { return ((char)code).ToString(); }
+    string name = k.ToString();
+    switch (name)
+    {
+        case "Volumeup":   return "VolumeUp";               // ★ 选项拼写
+        case "Volumedown": return "VolumeDown";
+        case "Volumemute": return "VolumeMute";
+        default: return name;                               // Space/Enter/Tab/Pageup/Minus… 与选项一致
+    }
+}
+```
+
+#### 十九-2 同一函数还会漏掉 `Space / - / = / , / .`
+
+旧写法是"可打印 ASCII 一律返回字符本身"：
+
+```csharp
+if (code >= 32 && code <= 126) { return ((char)code).ToString(); }   // ❌
+```
+⇒ `Space(32)` 存成 `" "`、`Minus(45)` 存成 `"-"`、`Equal(61)` 存成 `"="`、`Comma(44)` 存成 `","`、
+`Period(46)` 存成 `"."`，而 **mod.json 选项写的是 `Space / Minus / Equal / Comma / Period`**
+⇒ 这五个键**永远存不进去**。（字母/数字正好对得上，所以长期没暴露。）
+
+#### 十九-3 ★★★ 更隐蔽的第二层：**同步下拉时必须"值或 label 二选一"**
+
+宿主下拉**项文本 = `mod.json` 的 label**（`AddItem(label ?? value)`），
+而音量三键的 label 是**中文**（「手机音量+」）。旧的同步函数按**值**找项：
+
+```csharp
+for (int i = 0; i < ob.ItemCount; i++)
+    if (ob.GetItemText(i) == keySetting) { ob.Select(i); return; }     // ❌ 找不到 "VolumeUp"
+// 找不到就掉进兜底：选中「无绑定」
+```
+
+⇒ **录完音量键、点保存，反而把绑定清掉了**（且完全没有报错）。
+**修法**：按"值 **或** 该值的 label"匹配：
+
+```csharp
+private static bool ItemMatchesValue(string itemText, string value)
+{
+    if (itemText == null) { return false; }
+    string v = value ?? "";
+    if (itemText == v) { return true; }
+    return ValueLabels.TryGetValue(v, out string lab) && itemText == lab;   // value → label 映射表
+}
+```
+（`ValueLabels` 只需覆盖自己会写进去的那几个值：`""→（无绑定）`、`VolumeUp→手机音量+`…）
+
+### 二十、★★★ 自建面板改配置后，**必须补一次"同步宿主 + 触发宿主保存"**
+
+**症状**：自建面板（如卡槽的"面板呼出键"下拉）改完保存成功，但**用户之后点一次宿主「保存」，
+值被改回去了**。
+
+**根因链**：宿主读取器是 `() => Options[choice.Selected].Value`（按索引）⇒
+自建面板改了配置，**宿主那一行的下拉还停在旧选项** ⇒ 用户下次按宿主「保存」= 把旧值写回。
+
+**修法**：自建面板每次写值时，顺手把宿主同行控件同步 + 触发宿主保存链（配置页没开时两步都是空操作）：
+
+```csharp
+internal static void SyncHostRowAndSave(Node root, string targetKey, string keySetting)
+{
+    if (root == null || !GodotObject.IsInstanceValid(root)) { return; }
+    SyncConfigPageOptionButton(root, targetKey, keySetting);   // 同行下拉 Select 到新值
+    PressHostSaveButton(root);                                 // EmitSignal(Pressed) 走宿主保存
+}
+```
+（判据仍是 `FindByName(root, "Reset_" + targetKey) != null` = 配置页当前开着。）
+
+### 二十一、★★★ 动态数值 × 用户倍数：**"先算真实值，最后再乘倍数"**（本项目实测错解）
+
+**症状**（用户原话）：「开启多倍消耗后，无法正确跟随变动后的价格 —— 如 400+100 ×2 应该是 1200，但显示 900」。
+
+**根因**：先把"用户倍数"乘在**基准价**上，再走游戏自己的涨价公式 ⇒ 涨价那一段**拿不到倍数**：
+
+```
+旧（错）：400×2 + 100×n
+新（对）：(400 + 100×n) × 2
+```
+
+**游戏自己的公式**（`TowerDefenseInGamePacketShow.RefreshDynamicItemCost()`，逐字照抄）：
+
+```csharp
+num = config.GetCost();                                       // 基准（含该植物自己的变价行为）
+n   = GetCharacterNum(config.saveKey);                        // 场上几株
+if (costMultiple != -1.0) num = floor(num * pow(costMultiple, n));
+if (riseCost      != -1)  num += n * riseCost;                // ★ 涨价在乘法之后
+```
+
+#### 二十一-1 ★ 别抄"本卡"的字段，要取**目标植物自己的** `costMultiple/costRise`
+
+模仿卡这类"显示成别人"的卡，`card.costMultiple / card.riseCost` 来自**自己**的
+`_override`（为 `-1` 时会**回落到本卡 `characterConfig`**）⇒ 口径就错了。
+正确写法是取目标植物的配置：
+
+```csharp
+double mul = want.GetCostMultiple();    // ← 目标植物自己的
+int  rise = want.GetCostRise();
+```
+
+#### 二十一-2 ★★ 写 `card.itemCost` 同时修好「显示」和「扣费」（先确认再动手）
+
+`TowerDefenseInGamePacketShow.TryResolveModItemCost(out long cost)` 第一行就是
+**`cost = itemCost;`**，随后 `TryBeginSunSpend(accountId, cost, out receipt)` ⇒
+**卡面显示的数字和真正扣掉的阳光是同一个值** ⇒ 改一处两边都对，不用动 UI 标签。
+
+#### 二十一-3 ★ 通用教训：**"用户可调的倍率"永远乘在链条最末端**
+
+任何"最终价 = f(游戏各种加成) × 用户倍率"的量（价格、冷却、产量），
+都要**先完整复刻游戏那套加成公式得到"真实值"，最后一步才乘用户倍率**；
+反过来（先乘再走加成）必然出现"加成部分不受倍率影响"的偏差，且**看起来只差一点点**，极难发现。
+
+### 二十二、★★★ 「同一目标只能被一张卡占用」类约束：**"先到先得 + 两侧都判"**
+
+用户需求原话：「同一个卡牌 在放开模仿限制的情况下 一个卡牌只能模仿一次 不能模仿多次」。
+**歧义必须先问清**（"一张卡锁一个对象不再变" / "同一对象不能被两张卡占用" / "卡池只能点一次"），
+本项目问清后是**第二种**。
+
+落地要点（两条缺一不可）：
+
+1. **添加时预演**：点"加一张"的那一刻，先算出**新卡会占用哪个目标**
+   （模仿卡的目标 = 它左邻最近的实卡，而新卡总是追加到卡槽末尾 ⇒ 目标 = **牌组里最后一张实卡**），
+   已被占用 ⇒ **拒绝添加**（并把卡面 `Reset()` 回未选中态，别留下"半选中"的视觉）。
+2. **每帧解析时去重**：按**卡槽从左到右先到先得**，撞车的那张**移出卡槽**
+   （`HashSet<string>` 记已占用目标；收集到 `List` 里，**循环结束后统一删** ——
+   `DeletePacket` 会改 `packetList`，**绝不能在 `foreach (packetList)` 里调**）。
+
+### 二十三、★★★ 给"复制出来的单位/卡面"上特殊表现时：**先找游戏自己的标记通道**
+
+用户要求"把模仿的卡面植物变灰 / 复制出来的植物也变灰"。**别自己叠 `Modulate` 压暗**——
+游戏本体有**现成机制**，且是**真去色**：
+
+| 通道 | 玩法 |
+|---|---|
+| `TowerDefenseCharacter.SetSpriteGroupShaderParameter("imitater", true)` | 游戏自己的"我是模仿者"标记（内置模仿者变出植物时就这么干） |
+| `ShaderEffectComponent` 处理 `imitater` 标记 → **`AdobeAnimateSprite.SetRenderGrayscale(bool)`** | **真灰度渲染**（渲染快照按负 alpha 编码，shader 里 `instanceColor.a < 0.0` 判定） |
+
+⇒ **卡面**（也是 `AdobeAnimateSprite`）直接 `SetRenderGrayscale(true)` 即可；
+**场上植物**则直接复用 `"imitater"` 标记：
+- 开关"开" ⇒ **什么都不做**（游戏原生行为，零开销、零风险）；
+- 开关"关" ⇒ 反手摘掉：`SetSpriteGroupShaderParameter("imitater", false)`。
+
+⭐ **判据用公开 API**：`char.sprite.IsRenderGrayscaleEnabled()`（角色精灵上的灰度**只**由该标记驱动，
+见 `ShaderEffectComponent.cs:245`）⇒ **不用反射读私有 `_effectFlags`**，与铁律 21 一致。
+
+⚠️ 冻结预览态的精灵（卡面）改完渲染状态后要补一次提交：
+`spr.QueueRedraw(); if (spr.IsFrozenPreview) spr.EnsureFrozenPreviewRenderSubmission();`
+（同文件 `ApplyTargetSkin` 的收尾动作，见「共享组件」一节。）
+
+### 二十四、★★★ 多张同 key 卡的附带限制（做"可多选同一张卡"必读）
+
+放开"同一张卡可多张"之后，下游有两处**以 `saveKey` 为键**的地方会退化，**要提前告知用户**：
+
+| 位置 | 后果 |
+|---|---|
+| `EmitChooseOverAsync()` → 卡组数组含重复 key → `ReSelectButtonPressed` → `PacketListChoose()` 里的 `HasPacket(text)` **去重** | 「重新选卡 / 读卡组」只会恢复 **1 张** |
+| `packetColdDownState[config.saveKey]`（`TowerDefenseInGameSeedBank`） | 同 key 多张**共用一份冷却快照**，中途存档继续时互相覆盖 |
+| `PacketChooseFromName()`（CHOOSE 模式关卡预设卡）也会去重 | 预设写两次只进 1 张；**PRESET 分支 / 关卡编辑器不去重** ⇒ 那里本来就支持多张 |
+
+### 二十五、★★★ 工作法：**「记录本 + 独立复核」——本轮回溯最有价值的两条**
+
+#### 二十五-1 先写"记录本"再动手
+
+遇到"用户说没修好"的反复项时，**不要接着猜**。先做一次**证据归档**：
+
+| 证据 | 怎么拿 | 本项目用它定死了什么 |
+|---|---|---|
+| **存档 hexdump** | Python 直接读 `user://Csharp/save.res`，按 16 字节/行打印 hex + ASCII | 解出 `SunCollect=0`、`CoinCollect=0` ⇒ 证明"配置开着但值恒 0"（而不是用户没开） |
+| **游戏日志（第一现场）** | `logs\godot.log` + `PVZHE_Logs\godot_startup_*.log`（取 mtime 最新） | 卡槽序列 `[…][模仿者]` →（再点）→ `[…]` ⇒ 证明"再点一次=取消" |
+| **DLL 字符串实证** | `zipfile` 读包内 DLL，**UTF-8 搜方法名 / UTF-16 搜中文与字面量** | 证明"新代码真的编进去了"（防铁律 7 的假修复） |
+| **配置存档** | `%APPDATA%\...\ModSettings\<hash>.json`（按 modId） | 确认用户实际配置值与默认值不同 |
+
+#### 二十五-2 改动落地后，**开独立子代理做只读复核**
+
+把「改了什么 / 期望行为 / 涉及文件」丢给一个**只读**的复核代理，让它**对着解包源码逐条验证**，
+并明确要求它回答三件事：
+
+1. 每条结论**成立 / 不成立 / 存疑** + **源码文件:行号**；
+2. **它认为最脆弱的一环**（误判后最惨的失败模式是什么）；
+3. **更简单/更稳的替代实现**。
+
+⭐ **本项目实测收益（复核提出的问题全部命中，且都是我自己没想到的）**：
+- 「反向采纳不可逆 + 跨存档位污染」⇒ 采纳必须限定"**本会话内观察到 0→≥1 跃迁**"；
+- 「采纳失败后回写 0 ⇒ 会抹掉玩家刚花钱买的」⇒ 改为**挂起重试、绝不抹掉**；
+- 「按张数差补偿会先让游戏删掉第一张卡」⇒ 改成**独占按压语义**（不删任何已有卡）；
+- 「反射查订阅表一旦误判 ⇒ 每帧重复订阅 ⇒ 一次点击回调 N 次、卡槽被塞满」⇒
+  改成 `-=` 后 `+=` 的**幂等重挂（零反射、零状态）**。
+
+⇒ **纪律**：**功能类改动（尤其"接管原生行为"）在汇报"已修复"之前，至少过一次独立只读复核**；
+复核提出的 P0/中高必须**先修完再装机**。这比再多跑一遍构建值钱得多。
+
+### 二十六、★ 装机/清缓存前**先确认游戏没在跑**（本轮踩到，代价是删了运行中的解包缓存）
+
+```powershell
+Get-Process | Where-Object { $_.Path -like '*植物大战僵尸*' } |
+    Select-Object Id, ProcessName, StartTime, Path
+```
+
+**本轮实况**：游戏 22:47 就被用户启动了，我没查进程就 `rm -rf ModsCache\*` ⇒
+① `.active-*.lock` 被运行中的游戏占用，`rm` **静默失败**（被我顺手加的 `2>/dev/null` 吃掉）；
+② **把用户正在进行的那一局的解包缓存删了**（Mod 的 `PackageRoot` 指向 `ModsCache\...\content`，
+懒加载的贴图/资源可能失败）。⇒ 正确顺序永远是：**先查进程 → 再清**；
+清缓存要连**点文件**一起清（`find <dir> -mindepth 1 -delete`；`rm -rf dir/*` 删不到 `.active-*.lock`）。
+
+### 二十七、★ `build_mod.py` 的 `mod.json` 合并层：**解析失败必须炸，不能 `pass`**
+
+本项目某个 Mod 的构建脚本会**重新生成** `mod.json`，原实现是：
+
+```python
+try:
+    old = json.load(open(p, encoding="utf-8"))
+    for k in ("author","runtimeApiVersion","settings","playInstructions","description"):
+        if k in old: m[k] = old[k]
+except Exception:
+    pass          # ❌ 静默丢弃全部外部维护字段
+```
+
+**实况**：手改 `mod.json` 时漏转义一个 `"` ⇒ JSON 非法 ⇒ 构建**静默**按模板生成 ⇒
+`settings / playInstructions / author / runtimeApiVersion` **全被清空**（配置页变空页），
+而**构建 RC=0**，只有三件套里"配置项数"那一项才会露馅。
+
+**修法**：解析失败**直接抛错终止构建**：
+
+```python
+except Exception as e:
+    raise RuntimeError("现有 mod.json 解析失败：%r
+→ 拒绝继续生成清单（否则会静默清空 settings 等字段）" % e)
+```
+⇒ 与铁律 7「构建链路静默失败」同源：**任何"失败就跳过"的 try/except 都要当成定时炸弹**。
+
+### 二十八、★ 改完共享文件后**用特征串验证每个包**（不能只看 RC=0）
+
+`KeybindPanelManager.cs` 这种 Link 共享文件改动后（见「十五、共享组件不触发增量重编」），
+逐包验证要**扫 DLL 里的特征串**，两种编码都查：
+
+```python
+b = open(dll, "rb").read()
+hit = (name.encode("utf-8") in b) or (name.encode("utf-16-le") in b)   # 方法名=UTF-8；中文/字面量=UTF-16
+```
+
+本次三份 DLL（三倍加速/时停/卡槽）用 `Volumemute` / `手机音量+` / `IsMobileInput` 三个串确认新代码都在，
+并顺手把历史告警（TimeStop「DLL 比源码旧」）一起清掉。
+
+
+---
+
+## ★★★ 发布分发 + 日志门控 + 手机取证（2026-10-15 全程沉淀，血泪版）
+
+> 这一节全部是「**看起来做完了、其实没生效**」的假修复案例。每条都给了**可执行的验证动作**，
+> 照做能省下几十轮返工。
+
+### 一、发布分发
+
+#### 1. GitHub 发行版（沿用既有约定）
+
+- 每个 Mod 仓库保持**一个** release，标签固定 `upload`（HealthCooldownLine 用 `releases`，别改）；
+  每次发版只**替换 `.pmod` 附件** + 把 release **name 改成 `mod.json` 的 version**。
+- 附件名 = `<Mod>.pmod`（与仓库名一致）；改名前先 `DELETE /releases/assets/<id>` 再传，
+  否则 GitHub 会自动加后缀变成 `X-1.pmod` ✗。
+- 上传走 API：`POST https://uploads.github.com/repos/<owner>/<repo>/releases/<id>/assets?name=X.pmod`
+  （`Content-Type: application/octet-stream`）。
+- 校验：`GET /repos/.../releases` 取 `assets[0].size` 与本地包 `os.path.getsize` 比对 ✓。
+
+#### 2. 蓝奏云（CN 分发主渠道）——**扩展名硬限制**
+
+| 尝试 | 服务器原文 | 结论 |
+|---|---|---|
+| 传 `X.pmod` | `{"zt":0,"info":"不能上传.pmod格式的文件"}` | ✗ |
+| 传 `X.PMOD` | 同上（校验**不分大小写**） | ✗ |
+| 传 `.txt` 后改名成 `.pmod` | `{"zt":0,"info":"此功能仅会员使用，请先开通会员"}` | ✗（实测改名未生效）|
+
+⇒ **`.pmod` 永远不可能显示在蓝奏云上**。推荐做法：
+
+```
+把 X.pmod 打进 zip → 上传为   <中文名> <版本>.zip
+例：时停 1.1.1.zip / 游戏操作场景优化 2.0.0.zip / 血条·装填倒计时 1.21.2.zip
+```
+
+- **名字与版本必须与 `mod.json` 的 `name` + `version` 一致**（用户明确要求；旧名/旧版一律清掉）。
+- zip 内只放 `<Mod>.pmod` 一个文件（解压即用；游戏只按 `mods/*.pmod` 匹配，**对包文件名无要求**）。
+- 已装 skill：`.dsh/skills/lanzou-upload`（`scripts/lanzou_cli.py`，Cookie 存 `~/.workbuddy/lanzou/cookie.txt`）。
+  注意：**该账号密码登录已失效**，只能用浏览器 Cookie（`ylogin` + `ylogins` + `phpdisk_info` + `PHPSESSID`）。
+
+#### 3. ⚠️ 蓝奏云删除的**两条铁律**（我用真实事故换来的）
+
+1. **绝不通配删除**。曾写「遍历目录，凡 `.zip` 就删」，结果把用户放在**根目录**的
+   `grepWin-2.0.13-x64.zip`（1.6 MB，与 Mod 完全无关）删了 ✗ —— 只能让用户去**回收站**手动还原。
+   ⇒ 正确姿势：先 `task=5` 列目录拿 `id`，**按精确文件名/`file_id` 删**；名字匹配不上的一律不碰。
+2. **只在目标 `folder_id` 内操作**。写脚本复用 cookie/请求片段时，**变量会被覆盖**：
+   本机曾因后续 `exec` 的默认值把 `FOLDER` 覆盖成 `None`，而 `folder_id=None` 等价于**根目录** ⇒
+   删除动作跑到了根目录 ✗。⇒ 每次删除前**打印「folder_id + file_id + 名称」并核对**。
+
+蓝奏云接口补充（官方文档未列的）：
+
+```python
+# 列文件夹内**文件**（task=47 只返回子文件夹 ⇒ 看不到文件，别用它判断"空"）
+POST https://pc.woozooo.com/doupload.php
+  task=5&folder_id=<id>&pg=1&vei=VFBQUg1fUghQBA9fAFo=
+# → {"text":[{"id","name_all","size"}], "info":0|1}    info==0 表示没有下一页
+
+POST .../doupload.php  task=6&file_id=<id>      # 删除文件 → {"zt":1,"info":"已删除"}
+POST .../doupload.php  task=18&folder_id=<id>   # 文件夹分享信息 → info.new_url / info.pwd / info.onof
+```
+
+### 二、日志门控：`if (false)` 是**反的**
+
+宿主配置里的日志开关，代码写法几乎都是「取反提前返回」：
+
+```csharp
+private static void Log(string msg)
+{
+    if (!ReadBool(KLog, false)) { return; }   // 关 ⇒ 不打印 ✓
+    try { GD.Print(P + msg); } catch { }
+}
+```
+
+**要硬关日志（不看配置）必须改成 `if (true)`**：
+
+```csharp
+    if (true) { return; }                     // ✓ 无条件不打印
+    // if (false) { return; }                 // ✗✗ 永不返回 ⇒ **永远打印**
+```
+
+我曾在 26 处把 `!开关` 换成 `if (false)`，结果**日志不但没关，反而恒定成"开"** ✗，
+排查了 4 轮才反应过来是取反逻辑写反 —— 这是最典型的"假修复"。
+
+**批量替换的三条护栏**：
+
+1. **只替换日志开关**。我按 `if (ReadBool(K*))` 正则批量改，误伤了两个**功能开关** ✗：
+   `KAutoSave`（自动存档）和 `KEnabled`（屏蔽原生热键总开关）被改成 `if (false)` ⇒ 功能直接废掉。
+   ⇒ 替换前先列出全部命中项，人工确认每一个都是日志开关。
+2. **改 `mod.json` 默认值对已装过的机器无效** ✗：日志开关的真实值来自
+   `ModSettings/<hash>.json` 里**已保存的旧值**，改默认值只影响全新安装。
+   要"立刻静默"就得改代码（`if (true)` 或读配置处强制 `false`）。
+3. 每轮改完**必须验证**：`grep -c "if (false)"` 应为 0（或只剩确实来自正向判断的），
+   并确认没有 `原：!` 注释残留（那说明取反门控又被写反了）。
+
+宿主设置字段速查（写 `mod.json` 时最容易错）：
+
+| 需求 | 写法 |
+|---|---|
+| 显示名 | `"label": "中文名"`（**不是** `name`）|
+| 改完立即生效 | `"applyMode": "immediate"`（默认 `restart` ⇒ 用户会抱怨"改了没效果"）|
+| 战斗内也能保存 | `"affectsGameplay": false`（默认 `true` ⇒ 战斗中被拒绝保存）|
+| 分组标签 | `"group": "<名>"`；留空 ⇒ 宿主标签显示「未分组」|
+
+### 三、构建与装机的验证纪律
+
+1. **每个 Mod 的构建入口不同**：有的 `build_and_install.py`（自带编译+打包+装机），
+   有的 `build_mod.py --install`。跑错脚本 = 只编译不装机 ⇒ 用户拿到旧包 ✗。
+   ⇒ 统一走"编译 → 打包 → 复制到 `Mods/` → 校验"四步，别假设脚本会做全。
+2. **校验必须比字节**：`zipfile.ZipFile(pkg).read("Runtime/ModAssembly.dll")` 的 md5
+   **必须等于**刚编译出的 `bin/Release/<AssemblyName>.dll` 的 md5 ✓。
+   ⚠️ **不要用"注释串在不在 DLL 里"当依据** —— 注释在编译时被剥离，永远不在 ✗（我因此误判过一整轮）。
+3. **`dist/*.pmod` 可能是旧的**：`rm -rf dist` 之后如果没走到打包步骤，装机就会**静默留下旧包** ✗
+   （表现为"改了代码但行为不变"）。⇒ 每次装机后比对 `dist` 与 `Mods/` 的时间戳/md5。
+4. **同名程序集会被复用**：改完代码若日志标记没变，说明 Godot/Mono 加载了旧程序集。
+   ⇒ 同时改三处强制失效：`mod.json` 的 `id`、`runtimeEntryType`、`csproj` 的 `AssemblyName`。
+   （改完记得把 `enabled_mods.json` 里的旧 id 换掉、并删掉旧的 `ModsCache/<id>`。）
+5. `AssemblyName` 要**全局唯一**（安卓要求）；包内路径**必须**是 `Runtime/ModAssembly.dll`。
+
+### 四、手机端取证与部署
+
+#### 1. ⚠️ 读哪个日志，决定了你会不会连环误判
+
+| 路径 | 实际是什么 |
+|---|---|
+| `files/logs/godot.log`（app 内部，`run-as` 可读） | ✅ **当次会话的实时日志** —— 只看这个 |
+| `/sdcard/Documents/PVZHE_Logs/godot_startup_<ts>.log` | ❌ **上一次会话的转储副本**（文件名时间戳虽是本次启动时间，内容是上一轮的）|
+
+我曾连续多轮读后者，**拿旧日志判断新代码**，得出一堆错误结论（"缓存顽固""程序集复用""坐标不匹配"），
+来回改了十次 ✗。**排查前先确认日志里的版本标记是不是本次编译的**。
+
+#### 2. 零 Mod 安全模式（`safeMode=True`）
+
+```
+[ModManager] 上次 Mod 加载未完成（阶段 host-resources…）。当前以零 Mod 安全模式运行。
+[ModManager] enabled runtime apply complete: 0/0; rollbackBlocked=False; safeMode=True
+[Loading] loaded 0 enabled Mod package(s)
+```
+
+⇒ 根因是 `files/Mods/mod_boot_journal.json` 里 `"inProgress": true`（**上次加载被中断**留下的）。
+**修复**：删 `mod_boot_journal.json` + `mod_last_good.json` 后重启（正常应是 `safeMode=False`、
+`loaded 12 enabled Mod package(s)`）。**每次强杀/异常中断后都要清这两个文件**，
+否则下次启动"所有 Mod 都失效"，很容易误判成"Mod 坏了"。
+
+#### 3. 推包流程（缺一步就出旧包/坏包）
+
+```
+① adb shell pidof <pkg>                          # 必须先确认游戏没在跑
+② run-as <pkg> rm -rf files/ModsCache/<modid>    # 清解包缓存（否则可能加载旧副本）
+③ base64 -w0 本地.pmod | adb shell "run-as <pkg> sh -c 'base64 -d > files/Mods/X.pmod'"
+   ⚠️ 不要用 `adb shell ... cat >` —— 会截断二进制（曾毁掉 11 个包）
+   ⚠️ run-as 读不到 /sdcard
+④ run-as <pkg> md5sum files/Mods/X.pmod          # 必须与本地一致
+⑤ run-as <pkg> rm -f files/Mods/mod_boot_journal.json files/Mods/mod_last_good.json
+```
+
+#### 4. 手机端不能靠"坐标判据"
+
+游戏内部 `mousePos = mapControl.GetCanvasTransform().AffineInverse() * 视口坐标`（**地图世界坐标**），
+真机触摸事件与它不同系 ⇒ 任何"按落点算格子"的判定都容易错 ✗（实测 canvasXform 是单位矩阵也没用）。
+
+可用的正确姿势（铲子"没选到植物就取消"这种功能）：
+
+1. 用**游戏自己的** `TowerDefenseManager.GetMapGridPosFromMouse(world)` 求格子 —— 别自己算；
+2. 判定"该格有没有植物"要在格内**按多个高度百分比逐档探测**
+   `cell.GetShovelCharacter(pct, cfg)`（只探 `0.5` 会漏判 ✗）；
+3. **"界外"和"UI 点击"绝不能当作"没选到"** —— 点铲子图标本身就在 UI 上（界外），
+   若判成"没选到"会**立刻把刚拿起的铲子收掉**，表现为"拿不了铲子" ✗；
+4. 加"刚拿起的 300ms 内不判定" + "落点在铲子按钮矩形内不判定"两道护栏；
+5. 性能：遍历 9×6 格 + 每格几次反射**只在点击那一下执行**（不点击时 0 开销），量级亚毫秒 ✓
+   —— 不必担心掉帧，但**别放进 `_Process` 每帧跑**。

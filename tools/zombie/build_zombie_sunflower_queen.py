@@ -18,7 +18,7 @@ r"""build_zombie_sunflower_queen.py —— 生成《向日葵女王僵尸 + 火�
 
 贴图：身体复用重置版内置「火焰迪斯科 / 火焰舞者」转好的美术（经典版同名 reanim
 已由官方直转，无需再转）；头复用内置「向日葵女王 / 向日葵（僵尸）头」。
-⚠️ 经典版解包（`D:\zzz\extract_1789988101`）里**没有**这两只僵尸的头美术
+⚠️ 经典版解包（环境变量 `PVZ_CLASSIC` 指向的经典版解包树）里**没有**这两只僵尸的头美术
 （只有 `Zombie_discoFire_head_full.png` / `Zombie_backupFire_head_full.png` 两张
 「戴假发墨镜的僵尸头」整图，不是向日葵头）⇒ 头只能合成，这是唯一可行路线。
 
@@ -298,7 +298,7 @@ Position+Rotation，头跟着身体层摆（= 本仓《超级机枪读报僵尸�
      · 放大细看用 `.cache/_sq_zoom.py <in> <out> <x0,y0,x1,y1> <倍率>`。
 
   ⚙️ 涉及 `PIL` 的脚本必须用
-     `C:/Users/yanxulin002/.workbuddy/binaries/python/envs/default/Scripts/python.exe`（PIL 12.3.0）；
+     本机那个带 Pillow 的 Python（DSH 自带 3.12.14 + Pillow 12.3.0）；
      纯数学脚本（`.cache/_sq_head_place.py` / 本生成器）用
      `versions/3.13.12/python.exe`（**没有** PIL）。
 
@@ -449,12 +449,37 @@ import stat
 import sys
 import zipfile
 from datetime import datetime, timedelta, timezone
+# --- 本机路径适配（自动注入；换机器只改 tools/_env.py）---
+import os as _os
+import sys as _sys
+
+_TOOLS = _os.path.dirname(_os.path.abspath(__file__))
+while not _os.path.isfile(_os.path.join(_TOOLS, "_env.py")):
+    _parent = _os.path.dirname(_TOOLS)
+    if _parent == _TOOLS:
+        break
+    _TOOLS = _parent
+if _TOOLS not in _sys.path:
+    _sys.path.insert(0, _TOOLS)
+_PIPE = _os.path.join(_TOOLS, 'zombie')
+if _os.path.isdir(_PIPE) and _PIPE not in _sys.path:
+    _sys.path.insert(0, _PIPE)
+
+from _env import (  # noqa: E402
+    GAME, UNPACK, CLASSIC, MODS, USER_DATA_DIR, PY, WORKSPACE, REF_DIR,
+    require_ref_dir, require_classic, ensure_mods, unpack_status, describe,
+)
+try:  # 从属脚本：向上找 _gen.py 定位本流水线的工作区
+    from _gen import MOD_WORKSPACE  # noqa: F401,E402
+except ImportError:
+    MOD_WORKSPACE = None
+# --- 适配块结束 ---
 
 # ---------------------------------------------------------------- 顶层常量
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WS = HERE
-MODS_DIR = r"C:\Users\yanxulin002\AppData\Roaming\Godot\app_userdata\植物大战僵尸杂交版\Mods"
+MODS_DIR = MODS          # ← tools/_env.py 推导
 USER_DATA_DIR = os.path.dirname(MODS_DIR)
 
 BUILD_DIR = "SunFlowerQueen"                     # 工作区构建目录（ASCII）

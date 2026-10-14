@@ -1,0 +1,59 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://Prefab/TowerDefense/Character/TowerDefensePlant.tscn" id="1"]
+[ext_resource type="Resource" path="./SuperGatlingPeaComponentSet.tres" id="2"]
+[ext_resource type="Script" path="res://Asset/Anime/Character/Plant/Cover/GatlingPea/Scene/TowerDefensePlantGatlingPea.cs" id="3"]
+[ext_resource type="Resource" path="res://Resource/TowerDefense/Collision/CharacterHitBoxes/Rect_44x70_At_0_0.tres" id="4"]
+[ext_resource type="Resource" path="../Config/TowerDefensePlantSuperGatlingPea.tres" id="5"]
+[ext_resource type="PackedScene" path="../Sprite/SuperGatlingPea.tscn" id="6"]
+
+[node name="SuperGatlingPea" node_paths=PackedStringArray("sprite") instance=ExtResource("1")]
+ComponentSet = ExtResource("2")
+script = ExtResource("3")
+HitBoxDefinition = ExtResource("4")
+fireInterval = 1.5
+fireNum = 1
+projectileName = "Pea"
+idleAnimeClip = "BodyIdle"
+config = ExtResource("5")
+sprite = NodePath("SpriteGroup/TransformPoint/GatlingPea")
+metadata/mod_resource_kind = "Character"
+metadata/mod_display_name = "超级机枪射手"
+metadata/mod_character_category = "Plant"
+metadata/mod_character_config_path = "../Config/TowerDefensePlantSuperGatlingPea.tres"
+metadata/mod_character_sprite_scene = "../Sprite/SuperGatlingPea.tscn"
+
+[node name="ShadowSprite" parent="." index="0"]
+position = Vector2(0, 30)
+
+[node name="TransformPoint" parent="SpriteGroup" parent_id_path=PackedInt32Array(1006029617) index="0"]
+position = Vector2(0, 30)
+
+[node name="GatlingPea" parent="SpriteGroup/TransformPoint" index="0" instance=ExtResource("6")]
+position = Vector2(0, -30)
+trueFrameRate = 180.0
+
+[node name="Head" parent="SpriteGroup/TransformPoint/GatlingPea" index="0"]
+trueFrameRate = 180.0
+
+[node name="Marker2D" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="0"]
+position = Vector2(51.502, -16.8)
+
+[node name="Marker2D2" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="1"]
+position = Vector2(83.502, -16.8)
+
+[node name="Marker2D3" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="2"]
+position = Vector2(115.502, -16.8)
+
+[node name="Marker2D4" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="3"]
+position = Vector2(147.502, -16.8)
+
+[node name="Marker2D5" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="4"]
+position = Vector2(179.502, -16.8)
+
+[node name="Marker2D6" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="5"]
+position = Vector2(211.502, -16.8)
+
+[node name="Marker2D7" type="Marker2D" parent="SpriteGroup/TransformPoint/GatlingPea/Head" index="6"]
+position = Vector2(243.502, -16.8)
+[editable path="SpriteGroup/TransformPoint/GatlingPea"]
