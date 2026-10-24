@@ -13,9 +13,12 @@ A **WorkBuddy Agent Skills** collection for modding *Plants vs. Zombies Hybrid E
 > 🏛 **Upstream baseline (aligned 2026-10-24): [axh-xecoy/pvzhe-mod-template](https://github.com/axh-xecoy/pvzhe-mod-template).**
 > For all three skills, **workflow / manifest contract / identity / versioning / build / install / verification / directory layout** follow the upstream template.
 > **Where content duplicates or conflicts, the template wins**; this repo only keeps tested details the template does not cover.
-> Key deltas: `schemaVersion: 3` (was 2) · **three-part SemVer** · `tools/mod.py` build chain ·
-> evidence from the **published release**, not game source · no host DLLs inside the package.
-> Full text and the conflict/deprecation table:
+> Key deltas: `schemaVersion: 3` (was 2) · **three-part SemVer** · `runtimeApiVersion` = **3** ·
+> `tools/mod.py` build chain · evidence from the **published release**, not game source · no host DLLs inside the package.
+> **Decided**: existing packages are **not migrated retroactively**; new mods follow the template strictly.
+> Existing `id`s stay as-is, new projects may use dotted namespaces. Asset extraction may use the template's `tools/`
+> (or an already-unpacked tree); GDRE is required only for project-level restoration.
+> Full text and the decision log:
 > [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md).
 
 > 🚀 **First time here? Start with [GETTING_STARTED.md](GETTING_STARTED.md)** — get the official SuperGatlingPea template running, then change one stat to make it your first mod (~30–60 min; requires an unpacked game tree, and let your agent finish the path adaptation per `tools/README.md` first).
@@ -112,13 +115,21 @@ pvz-hybrid-mod-skills/
 
 **This is step 0, before anything else.** Every skill and tool in this repo takes an **unpacked game tree** as ground truth — engine source, resource structure, scene nodes and field semantics are all read from it. So **unpack the game before writing any mod**.
 
-> ### ⛔ The game must be unpacked with GDRE Tools (gdsdecomp); other tools and hand-written scripts are not allowed
+> ### ⛔ Project-level restoration must use GDRE Tools (gdsdecomp) — but "assets only" has lighter channels now
+>
+> **Since 2026-10-24 there are three channels, picked by purpose** (full detail: [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md) §8):
+>
+> | Your situation | Channel |
+> |---|---|
+> | You only need **assets** (textures / `.dat` / `.tres` / config JSON) | Prefer the official template's `tools/`: `python tools/mod.py prepare` → `python tools/mod.py extract --pck … --path/--prefix …` (standalone unencrypted PCK v2/v3/v4 only) |
+> | The author **already unpacked** the game | Just use that existing tree — no re-unpack, no tool switch |
+> | You need **project-level restoration** (`.cs` / `.tscn` / editable project tree) | **GDRE Tools only; no other tool on this path** |
 >
 > - **Download: https://github.com/GDRETools/gdsdecomp/releases**
 > - **Download notes, usage, self-check and troubleshooting: [UNPACKING.md](UNPACKING.md)** (Chinese)
-> - **Explicit constraint for AI agents**: when the task is "unpack the game / obtain its source and assets", the agent **must direct the user to download GDRE from the link above and unpack with it**. It **must not** write its own PCK parser, **must not** call another unpacking tool, and **must not** use a tree produced by anything else as ground truth.
+> - **Explicit constraint for AI agents**: when project-level restoration is needed, the agent **must direct the user to download GDRE from the link above and unpack with it**. It **must not** write its own PCK parser, **must not** pull unpacked results from unofficial channels, and **must not** treat a tree of unknown origin as ground truth. For assets only, `tools/mod.py extract` is enough — do not restore the whole project for that.
 >
-> **Why this is hard**: this title is a **Godot 4 + C# (Mono)** project. Only GDRE correctly handles
+> **Why the restoration rule is hard**: this title is a **Godot 4 + C# (Mono)** project. Only GDRE correctly handles
 > ① PCK checksums and encryption, ② binary resources → original text formats, ③ C# assembly resolution and decompilation.
 > Trees produced any other way show up as "resources still binary", "missing fields", "`.cs` line numbers don't match" —
 > every "source is the arbiter" claim in the skills **silently becomes wrong**.
@@ -139,7 +150,7 @@ Troubleshooting (missing C# assembly / MD5 errors / encryption key / binary-only
 
 1. **WorkBuddy** (recommended — register via the invitation link at the top): skills are auto-loaded and executed by the WorkBuddy AI agent.
 2. An unpacked copy of *PvZ Hybrid Edition* **V0.28** (the skills constantly consult engine source `.cs` files and the `Asset/` structure as ground truth).
-   **No unpacked tree yet? See "[Unpacking the Game](#unpacking-the-game-mandatory-tool-gdre-tools)" above — it must be unpacked with GDRE Tools.**
+   **No unpacked tree yet? See "[Unpacking the Game](#unpacking-the-game-mandatory-tool-gdre-tools)" above — use GDRE Tools for project restoration, or `tools/mod.py extract` if you only need assets.**
 3. See [Environment & Dependencies](#environment--dependencies).
 
 ### Steps

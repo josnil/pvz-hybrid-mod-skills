@@ -17,6 +17,10 @@ agent_created: true
 > 速记：`schemaVersion: 3` ｜ `version` 用 **SemVer 三段** ｜ `id` 为 `[0-9a-z_.-]` 1–32 位 ｜
 > 构建走 `tools/mod.py prepare/build/check/install/verify` ｜ 判据来自**已发布发行版**（无需源码）｜
 > 包内禁止宿主 DLL / 整份 `bin/`。
+>
+> **2026-10-24 已裁定**：`runtimeApiVersion` 写 **3** ｜ 既有包不迁移、新 mod 严格照模板 ｜
+> 既有 `id` 不动、新项目可点分 ｜ 取资源可用模板 `tools/`，已解包则直接用解包文件 ｜ 不按 0.31 重验既有实证。
+> ⚠️ 若 `references/` 旧文仍写 `runtimeApiVersion = 1`（贡献者原文，暂不改）——**以本文件为准**。
 
 一条植物 Mod 从需求到「装机可玩」的完整走法。**先读第 1、2 节再动手**，能省掉 80% 的返工。
 
@@ -44,9 +48,12 @@ agent_created: true
 `.pmod` = ZIP（`mod.json` + `Runtime/ModAssembly.dll` + `resources` 里显式列出的自有资源），
 **不是** Godot PCK，**不要** `--export-pack`。
 
-> **⛔ 解包双通道（别用一条否定另一条）**
-> - **工程级还原**（要 `.cs` / `.tscn` / 可编辑工程树）→ **只能用** [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)（[下载说明](../../UNPACKING.md)）；禁止其他解包器或自制解析脚本。自检：树里同时有 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/`，且能搜到 `Asset/Config/Projectile/ProjectileResource.json`。
-> - **发行版按需取资源**（模板玩家路径，不需要源码）→ `python tools/mod.py prepare`（生成 `.work/pck-index.json`）+ `python tools/mod.py extract --pck … --path/--prefix …`。这是模板官方工具链，**不属于**「其他解包器」，见基线文档 §8。
+> **⛔ 取资源 / 解包三通道（按用途选，别用一条否定另一条 · 2026-10-24 放宽）**
+> - **只是需要资源**（贴图 / `.dat` / `.tres` / 配置 JSON）→ **优先用模板 `tools/`**：`python tools/mod.py prepare`（生成 `.work/pck-index.json`）+ `python tools/mod.py extract --pck … --path/--prefix …`。只支持独立未加密 PCK v2/v3/v4。
+> - **制作者已经解包过游戏** → **直接用现有解包文件**，不必重解、不必换工具。
+> - **工程级还原**（要 `.cs` / `.tscn` / 可编辑工程树）→ **只能用** [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)（[下载说明](../../UNPACKING.md)）；这条路上禁止其他解包器或自制解析脚本。自检：树里同时有 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/`，且能搜到 `Asset/Config/Projectile/ProjectileResource.json`。
+>
+> 注意 `mod.py extract` **不是**工程还原：`.ctex` / `project.binary` / `.gdc` 仍是导入或编译格式，不会变成可编辑源码。详见基线文档 §8。
 
 ## 1. 先做三个决定（决定后面 80% 的工作量）
 
@@ -310,7 +317,8 @@ override 里**只写 `coverCanDirectPlant` 一个字段**（其余默认值全�
 五条硬约束（写错 = **整包被拒/回滚**）：
 
 1. `runtimeAssembly` **必须恰好是字面量** `"Runtime/ModAssembly.dll"`（**这是包内物理路径，不许改**）；
-2. `runtimeApiVersion` **必须恰好 `1`**；入口三个回调**一律 try/catch 绝不抛**（抛 = 无条件整包回滚）；
+2. `runtimeApiVersion` **写 `3`**（2026-10-24 裁定；0.30 起 `XWModRuntimeApi.CurrentVersion = 3`，0.29 时代才是 `1`，
+   模板示例里的 `1` 只是兼容取值）；入口三个回调**一律 try/catch 绝不抛**（抛 = 无条件整包回滚）；
 3. `provides`/`overrides` 非空时，包内**每个**被识别的文件都必须在里面声明；
 4. `Runtime/` 目录**只许有一个** `ModAssembly.dll`（`.dll/.exe/.bat/.cmd/.ps1/.cs/.gd` 都算可执行文件，多一个就拒收）；
 5. ★★★ **`.csproj` 必须写 `<AssemblyName>【本 Mod 的 id】</AssemblyName>`** ——

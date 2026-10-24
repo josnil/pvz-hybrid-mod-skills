@@ -142,7 +142,7 @@ PR 描述由 `.github/PULL_REQUEST_TEMPLATE.md` 引导，包含：变更类型�
 - [ ] 涉及「两份构建」（remake / console）的改动，两侧保持一致
 - [ ] 改了对外能力 / 目录树 / 邀请码时，`README.md` 与 `README_EN.md` **双语同步**
 - [ ] 脚本内不 spawn git 子进程、不把 token 写进仓库
-- [ ] **未使用 GDRE 以外的工具解包**（详见 README「[解包游戏](README.md#解包游戏唯一指定工具-gdre-tools)」与 [UNPACKING.md](UNPACKING.md)）
+- [ ] **工程级还原用的是 GDRE**（其他工具 / 自制脚本不得用于还原工程树；只是取资源可用模板 `tools/mod.py extract` 或现有解包树。详见 README「[解包游戏](README.md#解包游戏唯一指定工具-gdre-tools)」与 [UNPACKING.md](UNPACKING.md)）
 
 ### 3.6 评审与合并
 

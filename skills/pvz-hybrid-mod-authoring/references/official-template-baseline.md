@@ -16,6 +16,9 @@
    **不得**再用本仓库的旧约定去覆盖模板；反之才是允许方向。
 5. 上游自述定位：**「本模板是基于发布包实测的社区示例，不是官方 SDK」**。
    因此本文的「官方」= 本组织指定的**上游基线**，不是引擎厂商背书。
+6. **§10 是本文件的裁决区**：凡 §10 已作裁定的条目（`runtimeApiVersion`、迁移策略、`id` 风格、解包通道、
+   复验范围、工程形态），**以 §10 为准**，不再讨论；本文其余章节若与 §10 冲突，按 §10 理解。
+   少数 `references/` 旧文（贡献者原文）仍写 `runtimeApiVersion = 1`，**一律以 §10 第 1 条为准（写 3）**。
 
 ## 1. 环境基线
 
@@ -67,7 +70,7 @@
   "playInstructions": "启用后重启游戏，查看 Hello World 文字及 HELLO_READY 日志。",
   "runtimeAssembly": "Runtime/ModAssembly.dll",
   "runtimeEntryType": "HelloMod.Entry",
-  "runtimeApiVersion": 1,
+  "runtimeApiVersion": 3,
   "runtimeAssemblyPolicy": "required",
   "resources": [],
   "scripts": [],
@@ -77,14 +80,14 @@
 
 | 字段 | 规则（模板校验口径） |
 |---|---|
-| `schemaVersion` | **3**。宿主接受 1–3；`>3` 直接抛 `unsupported mod schema version`。**新包一律写 3** |
-| `id` | **1–32 个 ASCII**，字符集 `[0-9a-z_.-]`；无大写/空格/斜杠；`.`、`..` 不算有效身份。推荐点分命名空间风格（`local.hello-world`、`zombie-kill-counter`） |
+| `schemaVersion` | **3**。宿主接受 1–3；`>3` 直接抛 `unsupported mod schema version`。**新包一律写 3**（2026-10-24 裁定：既有包**不回溯迁移**，后续新 mod 严格执行模板） |
+| `id` | **1–32 个 ASCII**，字符集 `[0-9a-z_.-]`；无大写/空格/斜杠；`.`、`..` 不算有效身份。**新项目用点分命名空间**（`local.hello-world`、`zombie-kill-counter`）；**既有 id 一律保持原样，不改** |
 | `name` | 必填显示名，可含中文；模板不设 32 字符上限 |
 | `author` | 必填，**≤32 个 UTF-16 单元**（emoji 等补充平面字符占 2） |
 | `version` | **≤32 字符，SemVer**：`major.minor.patch[-prerelease][+build]`；不加 `v`、不写 `1.0`、数字段禁前导零；默认 `0.1.0` |
 | `playInstructions` | 模板新增字段：面向玩家的启用/观察说明 |
 | `runtimeAssembly` | 硬校验，**恰好** `"Runtime/ModAssembly.dll"` |
-| `runtimeApiVersion` | **宿主当前 API 版本**。0.30 源码实测 `XWModRuntimeApi.CurrentVersion = 3`、`SupportedVersions = [1,2,3]`（0.29 时代为 `1`）。**新包建议写 3**；写不支持的值 ⇒ 入口 init 返回 false ⇒ 无条件整包回滚。⚠️ 模板示例 `mod.json` 写的是 `1`（**兼容但非当前**），与引擎实测并列给出，见 §10 第 7 条 |
+| `runtimeApiVersion` | **写 3**（2026-10-24 裁定）。依据：0.30 发行版源码 `XWModRuntimeApi.CurrentVersion = 3`、`SupportedVersions = [1,2,3]`、`ModExporter.cs:281` 亦写 3。写不支持的值 ⇒ 入口 init 返回 false ⇒ **无条件整包回滚**。模板示例 `mod.json` 写 `1`，属可加载的兼容取值但**非当前**，不要把 `1` 当默认 |
 | `runtimeAssemblyPolicy` | `"required"` / `"optional"`；新 Mod 建议先 `optional` |
 | `resources` | **显式允许名单**，不列不进包 |
 | `postId`（可选） | 社区投稿 ID 字符串（如投稿链接 `/mods/121` ⇒ `"121"`）；与 `id` 无关 |
@@ -167,18 +170,21 @@ python tools/mod.py check --release --mods-dir '<实际 Mods 目录>'
 - 平台发布 / 邀请等约定；
 - 社区口吻的「唯一原因」「永远每帧」「只能用某种工具」。
 
-## 8. 解包口径的重叠与切分（★ 需人工确认，见 §10）
+## 8. 解包 / 取资源口径（2026-10-24 裁定：放宽）
 
-本仓库曾规定「解包**只能**用 GDRE Tools，禁止其他工具或自制脚本」。模板提供另一条官方通道：
+旧的「解包**只能**用 GDRE Tools，禁止其他工具或自制脚本」**已放宽**。现行三条通道按用途切分，互不替代：
 
-| 目的 | 通道 | 产出 | 是否冲突 |
-|---|---|---|---|
-| 需要**工程级还原**（`.cs`、`.tscn`、可编辑工程树） | **GDRE Tools**（本仓库既定硬规定，仍有效） | Godot 工程树 | — |
-| 发行版**按需取资源/配置**（release-only 玩家路径） | `python tools/mod.py extract --pck ... --path/--prefix ...` | **原始文件提取**，不是工程还原 | 用途不同，**不互相替代** |
-| 全量发行资源索引 | `python tools/mod.py prepare` → `.work/pck-index.json` | 索引 + 缓存 | — |
+| 你的处境 | 该走的通道 | 产出 / 限制 |
+|---|---|---|
+| **只是需要资源**（贴图、`.dat`、`.tres`、配置 JSON） | **优先用模板 `tools/`**：`python tools/mod.py prepare`（全量索引 `.work/pck-index.json`）→ `python tools/mod.py extract --pck ... --path/--prefix ...` | 原始文件提取。只支持**独立未加密 PCK v2/v3/v4**；嵌入式 / 加密 / 稀疏 / 差分包会**明确失败** |
+| **制作者已经解包过游戏** | **直接用现有解包文件**，不必重解、不必换工具 | 以手头解包树的实际内容为准；只在产物上标注来源版本 |
+| **需要工程级还原**（`.cs`、`.tscn`、可编辑的 Godot 工程树） | **GDRE Tools**（仍然是这条路上唯一允许的工具） | Godot 工程树 |
 
-模板对 `extract` 的边界写得很明确：只支持**独立未加密 PCK v2/v3/v4**，遇到嵌入式/加密/稀疏/差分包**明确失败**；
-且 `.ctex` / `project.binary` / `.gdc` 仍是导入或编译格式，**不会**被还原成可编辑源码。
+三条硬边界（不要越）：
+
+1. `mod.py extract` **不是**工程还原工具——`.ctex` / `project.binary` / `.gdc` 仍是导入或编译格式，**不会**变成可编辑源码。
+2. 要读**逻辑源码**（`.cs`）只能靠 GDRE 还原工程；拿不到就别猜字段，回到已发布 DLL 反射（模板 `tools/HostProbe/`）。
+3. 无论哪条通道，**产物里不得夹带游戏内容**（见 §1 与本仓库 `.gitignore` 规矩）。
 
 ## 9. 模板 Skill 路由（我方三个技能如何退位）
 
@@ -201,23 +207,34 @@ python tools/mod.py check --release --mods-dir '<实际 Mods 目录>'
 | 关卡 / 章节 / 模式入口 | `pvzhe-level-create`、`pvzhe-mode-create` | 不覆盖 |
 | 同步上游模板 | `pvzhe-project-update`（使用者）/ `pvzhe-template-upgrade`（维护者） | 不覆盖 |
 
-## 10. 仍待人工确认（不要当已决事项）
+## 10. 裁决记录（2026-10-24 用户裁定 · 已生效，不再讨论）
 
-1. **工程形态**：是否把现有 `ModWorkspace` 生成器工坊整体迁到模板的 MDK 工程形态（`src/` + `mod/`）。
-   本文只做「契约对齐」，**未迁移**任何现有 mod 工程。
-2. **`schemaVersion` 迁移**：新包写 3 已定；**既有的 28 个 `mod.json` 尚未批量改**（涉及重打包与验证）。
-3. **`id` 命名风格**：模板允许点号并推荐点分命名空间；我方既有 id 全是无分隔（`supergatlingpea`）。
-   **既有 id 不建议改**（会破坏启用配置/存档/资源身份）。新项目是否统一用点分风格，待定。
-4. **解包双通道**（§8）：需确认「GDRE 管工程还原 / `mod.py extract` 管发行取资源」的切分是否采纳。
-5. **零散实证内容的去留**：本仓库 900 KB 中的数值/字段/动画细节，模板只承认「线索」地位；
-   是否逐条按 0.31 重验，需另立验收轮次。
-6. **`version` 32 字符上限**与 `-PRERELEASE` 渠道后缀（如 `-hand`）并用是否会长到超限，需新项目命名时注意。
-7. **`runtimeApiVersion` 取值分歧（重要）**：模板示例 `mod.json` 写 `1`，而 0.30 发行版源码实测
-   `XWModRuntimeApi.CurrentVersion = 3`（`SupportedVersions = [1,2,3]`）。两者**都能加载**（1 是兼容取值），
-   但「当前版本」按引擎是 **3**。本文档取「新包写 3」，与模板示例并存说明；
-   若上游后续统一为 1，以模板为准即可，不影响既有包。
-8. **`schemaVersion: 3` 与 `contentEntries`**：3 引入 `contentEntries` / `privateResources` 通道（`ModLoader.cs`
-   对 `< 3` 的包走 legacy 路径）。本仓库既有 28 个 `mod.json` 仍是 2，**尚未迁移**。
+| # | 原分歧 | **裁定** |
+|---|---|---|
+| 1 | `runtimeApiVersion` 写 `1` 还是 `3` | **写 3**。模板示例的 `1` 只是历史兼容取值，不作为默认 |
+| 2 | 既有 28 个 `mod.json` 是 `schemaVersion: 2`，是否迁移 | **不迁移**，既有包按原样维护；**后续新 mod 严格执行模板**（`schemaVersion: 3` + 本文件全部契约） |
+| 3 | `id` 用点分还是无分隔 | **既有 id 保持不动**（换 id 会破坏启用配置 / 存档 / 资源身份）；**新项目可用点分命名空间** |
+| 4 | 解包工具归属 | **需要资源就用模板 `tools/`**；**制作者已解包则直接用解包文件**；只有工程级还原（`.cs`/`.tscn`）仍认 GDRE。见 §8 |
+| 5 | 是否按 0.31 逐条重验本仓库 900 KB 实证细节 | **不重验**。默认「可复现即可」，出现反例时再单独立项复核 |
+| 6 | 是否把 `ModWorkspace` 生成器工坊迁到模板 MDK 布局 | **不整体迁移**（见下） |
+| 7 | 5 个纯贡献者文件未做模板对齐 | **暂时无视**，保持远端原样 |
+
+### 第 6 条的取舍理由（已按此执行）
+
+不整体迁移，理由是：`ModWorkspace/*/` 下的生成器与既有 28 个包**强绑定**（路径、`.dat` 尾部图层数、uid 引用、装机目录都是按老结构写死的），
+整体搬进 `src/` + `mod/` 的代价约等于全部重打包一次，而裁定第 2 条已经明确「既有包不迁移」。
+
+因此定为**双轨**：
+
+- **存量**：`ModWorkspace` 生成器继续原样可用，定位为**本地历史工具链**，不对外作为前置。
+- **增量**：新 mod **一律从模板 MDK 布局起步**（§2 目录契约 + §4 命令链），不再往 `ModWorkspace` 里加新生成器。
+
+### 仍然只是「要注意」、不是待决项
+
+- `version` 有 **32 字符上限**：SemVer 主体 + `-prerelease` 渠道后缀（如 `-hand`）拼起来别超。
+- `schemaVersion: 3` 引入了 `contentEntries` / `privateResources` 通道（`ModLoader.cs` 对 `< 3` 走 legacy 路径）。
+  **新包用 3 就要按 3 的口径写资源**；既有 2 的包继续走 legacy，行为不变。
+- `XWModDependency.versionRange` 在 0.30 中**声明但未被消费**——别指望用它做依赖版本约束。
 
 ---
 

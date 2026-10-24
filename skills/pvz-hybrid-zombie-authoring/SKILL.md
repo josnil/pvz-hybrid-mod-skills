@@ -17,6 +17,10 @@ agent_created: true
 > 速记：`schemaVersion: 3` ｜ `version` 用 **SemVer 三段** ｜ `id` 为 `[0-9a-z_.-]` 1–32 位 ｜
 > 构建走 `tools/mod.py prepare/build/check/install/verify` ｜ 判据来自**已发布发行版**（无需源码）｜
 > 包内禁止宿主 DLL / 整份 `bin/`。
+>
+> **2026-10-24 已裁定**：`runtimeApiVersion` 写 **3** ｜ 既有包不迁移、新 mod 严格照模板 ｜
+> 既有 `id` 不动、新项目可点分 ｜ 取资源可用模板 `tools/`，已解包则直接用解包文件 ｜ 不按 0.31 重验既有实证。
+> ⚠️ 若 `references/` 旧文仍写 `runtimeApiVersion = 1`（贡献者原文，暂不改）——**以本文件为准**。
 
 > 姊妹技能：`pvz-hybrid-mod-authoring`（全量/通用，含包格式与编辑器）、`pvz-hybrid-plant-authoring`（植物端到端）。
 > 本技能只讲**僵尸**这条路，以及它与植物的**每一个差异**。
@@ -1351,7 +1355,7 @@ Walk/Idle/Eat/Death 跟随躯干；攻击用**自编整体摆动**（后仰举�
 **④ ★★ mod 托管 DLL 契约**：`net9.0`，`AssemblyName` = mod id，引用游戏
 `PlantsVsZombies.dll` + `GodotSharp.dll`（`Private=false`），产物改名
 `Runtime/ModAssembly.dll`；manifest 四字段 `runtimeAssembly / runtimeEntryType /
-runtimeApiVersion=1 / runtimeAssemblyPolicy=optional`；
+runtimeApiVersion=3 / runtimeAssemblyPolicy=optional`（**2026-10-24 裁定写 3**；0.29 时代才是 1，模板示例的 1 仅属兼容）；
 接口 `IXWModRuntimeEntry{Initialize(XWModRuntimeContext); OnAllModsLoaded(); Shutdown();}`。
 ★ 新增内容放 **`provides`**；放 `overrides` 会报 `overrides target is missing`。
 

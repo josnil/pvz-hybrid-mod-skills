@@ -37,9 +37,10 @@
 | **游戏解包目录** | 含 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/` 的树。生成器要读里面的基底资源，技能文档所有"以源码为准"的判据也指向它。确认找对了：能找到 `Asset/Config/Projectile/ProjectileResource.json` |
 | **路径适配** | 仓库脚本按作者 Windows 环境写死了绝对路径；这一步没做完，生成器跑不起来 |
 
-> 🧩 **还没有解包树？** 先看 **[UNPACKING.md](UNPACKING.md)**——解包**只能**用
-> [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，**禁止**使用其他工具或自制脚本
-> （包括让 agent 自己写 PCK 解析器）。或者跳到文末「[热身备选](#热身备选零解包的-5-分钟)」先感受一下打包-校验闭环，回头再补。
+> 🧩 **还没有解包树？** 先看 **[UNPACKING.md](UNPACKING.md)**——**工程级还原**（要 `.cs` / `.tscn`）**只能**用
+> [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，这条路上**不接受**其他工具或自制脚本
+> （包括让 agent 自己写 PCK 解析器）；**只是取资源**则可用官方模板 `tools/mod.py prepare/extract`，或直接使用已有解包树。
+> 或者跳到文末「[热身备选](#热身备选零解包的-5-分钟)」先感受一下打包-校验闭环，回头再补。
 
 ---
 

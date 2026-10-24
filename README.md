@@ -13,9 +13,11 @@
 > 🏛 **上游基线（2026-10-24 对齐）：[axh-xecoy/pvzhe-mod-template](https://github.com/axh-xecoy/pvzhe-mod-template)。**
 > 本仓库三个技能的**流程 / 字段契约 / 身份 / 版本 / 构建 / 安装 / 验证 / 目录**一律以上游模板为准；
 > **重复或冲突一律以模板为准**，本仓库只保留模板未覆盖的**实测细节**。
-> 关键差异：`schemaVersion: 3`（原 2）· `version` 用 **SemVer 三段** · 构建走 `tools/mod.py` ·
-> 判据来自**已发布发行版**而非游戏源码 · 包内禁止宿主 DLL。
-> 全文与冲突/废弃对照见
+> 关键差异：`schemaVersion: 3`（原 2）· `version` 用 **SemVer 三段** · `runtimeApiVersion` 写 **3** ·
+> 构建走 `tools/mod.py` · 判据来自**已发布发行版**而非游戏源码 · 包内禁止宿主 DLL。
+> **已裁定**：既有包**不回溯迁移**、新 mod 严格照模板；既有 `id` 不动、新项目可点分；
+> 取资源可用模板 `tools/`（已解包就直接用解包文件），只有工程还原必须 GDRE。
+> 全文与裁决记录见
 > [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md)。
 
 > 🚀 **第一次用？直接从 [GETTING_STARTED.md](GETTING_STARTED.md) 开始**——跑通官方样板「超级机枪射手」，再改一个数值做出你的第一个 Mod（约 30–60 分钟；需一份游戏解包目录，首次演练前请让 agent 按 `tools/README.md` 完成路径适配）。
@@ -70,7 +72,7 @@ pvz-hybrid-mod-skills/
 ├── README.md                       # 本文档（中文）
 ├── README_EN.md                    # 英文文档
 ├── GETTING_STARTED.md              # 🚀 小白快速上手（跑通样板 + 改数值做出第一个 Mod）
-├── UNPACKING.md                    # 🧩 解包游戏（唯一指定工具 GDRE Tools：下载说明 / 使用方法 / 自检）
+├── UNPACKING.md                    # 🧩 解包游戏（工程还原唯一指定 GDRE Tools：下载说明 / 使用方法 / 自检）
 ├── CONTRIBUTING.md                 # 贡献规范（Issue / PR）
 ├── LICENSE                         # MIT
 ├── skills/                         # 三个技能模块，每个文件夹即一个可独立安装的技能
@@ -111,14 +113,23 @@ pvz-hybrid-mod-skills/
 
 **这是动手前的第 0 步。** 本仓库的所有技能与工具都以**解包后的游戏目录**为事实判据——引擎源码、资源结构、场景节点、字段语义都从那里读，所以**做任何 Mod 之前，先把游戏解包**。
 
-> ### ⛔ 解包必须使用 GDRE Tools（gdsdecomp），禁止使用其他工具或自制脚本
+> ### ⛔ 工程级还原必须用 GDRE Tools（gdsdecomp）—— 但「只是取资源」另有更轻的通道
+>
+> **2026-10-24 起按用途分三条通道**（细则见 [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md) §8）：
+>
+> | 你的处境 | 走哪条 |
+> |---|---|
+> | 只想拿**资源**（贴图 / `.dat` / `.tres` / 配置 JSON） | 优先用官方模板 `tools/`：`python tools/mod.py prepare` → `python tools/mod.py extract --pck … --path/--prefix …`（只支持独立未加密 PCK v2/v3/v4） |
+> | 你**已经解包过**游戏 | 直接用手头解包树，不必重解、不必换工具 |
+> | 需要**工程级还原**（`.cs` / `.tscn` / 可编辑工程树） | **只能用 GDRE Tools，这条路上不接受其他工具** |
 >
 > - **下载地址：https://github.com/GDRETools/gdsdecomp/releases**
 > - **下载说明、使用方法、自检步骤、排障：[UNPACKING.md](UNPACKING.md)**
-> - **对 AI agent 的明确约束**：当任务是「解包游戏 / 获取游戏的源码与资源」时，**必须引导用户到上面的地址下载 GDRE 并用它解包**；
->   **不得**自行编写 PCK 解析器、**不得**调用其他解包工具、**不得**从非官方渠道获取解包结果，也不得拿别的工具产出的树当事实判据。
+> - **对 AI agent 的明确约束**：需要工程还原时**必须引导用户到上面的地址下载 GDRE 并用它解包**；
+>   **不得**自行编写 PCK 解析器、**不得**从非官方渠道获取解包结果、**不得**拿来路不明的树当事实判据。
+>   需要资源时用模板 `tools/mod.py extract` 即可，不必为此还原整个工程。
 >
-> **为什么这条是硬的**：本作是 **Godot 4 + C#（Mono）** 工程。只有 GDRE 能同时正确处理
+> **为什么工程还原这条是硬的**：本作是 **Godot 4 + C#（Mono）** 工程。只有 GDRE 能同时正确处理
 > ① PCK 的校验和与加密、② 二进制资源 → 原始文本格式的反转换、③ C# 程序集的定位与反编译。
 > 其他路子解出来的树会表现为"资源还是二进制""缺字段""`.cs` 行号对不上"——技能里所有"以源码为准"的判据会**当场失效，而且错得没有症状**。
 
@@ -138,7 +149,7 @@ pvz-hybrid-mod-skills/
 
 1. **WorkBuddy**（推荐，通过顶部邀请链接注册）：技能由 WorkBuddy 的 AI 助手自动加载与执行。
 2. 《植物大战僵尸杂交版》**V0.28 解包目录**（技能大量引用其中的引擎源码 `.cs` 与资源结构作为"事实判据"）。
-   **还没有解包树？先看上面「[解包游戏](#解包游戏唯一指定工具-gdre-tools)」一节——必须用 GDRE Tools 解包。**
+   **还没有解包树？先看上面「[解包游戏](#解包游戏唯一指定工具-gdre-tools)」一节——工程还原用 GDRE Tools，只取资源可用模板 `tools/mod.py extract`。**
 3. 见下文[环境与依赖清单](#环境与依赖清单)。
 
 ### 安装步骤
@@ -228,7 +239,7 @@ pvz-hybrid-mod-skills/
 |---|---|---|
 | **WorkBuddy**（推荐） | 技能的运行载体 | 通过[邀请链接](https://www.workbuddy.cn/events/invite?inviteCode=ryoc35nu7pi1nq)注册；不用 WorkBuddy 也可当文档读 |
 | **《植物大战僵尸杂交版》V0.28 解包** | 事实判据来源 | 技能需要读 `addons/ModEditor/ModSystem/` 下的引擎源码（`ModLoader.cs`、`XWModManifest.cs` 等）与 `Asset/` 资源结构 |
-| **[GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)** | **解包游戏的唯一指定工具** | ⛔ **必须**用它解包，**禁止**其他工具 / 第三方 PCK 工具 / 自制脚本。只有它能正确处理本作（Godot 4 + C# Mono）的 PCK 校验和与加密、二进制资源 → 文本反转换、C# 程序集定位。详见 **[UNPACKING.md](UNPACKING.md)** |
+| **[GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)** | **工程级还原的唯一指定工具** | ⛔ **要 `.cs` / `.tscn` / 可编辑工程树就必须**用它，这条路上**不接受**其他工具 / 第三方 PCK 工具 / 自制脚本。只有它能正确处理本作（Godot 4 + C# Mono）的 PCK 校验和与加密、二进制资源 → 文本反转换、C# 程序集定位。**只取资源**则可用官方模板的 `tools/mod.py extract`，已解包则直接用现有解包树（见上节三通道）。详见 **[UNPACKING.md](UNPACKING.md)** |
 | **Python ≥ 3.13** | 生成器 / 闸门 / 校验脚本 | 纯数学脚本零第三方依赖 |
 | **Pillow (PIL)** | 外观直转、抠像、离线渲染、对照图 | `pip install pillow` |
 

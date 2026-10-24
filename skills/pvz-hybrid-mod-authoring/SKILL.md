@@ -31,30 +31,37 @@ agent_created: true
 > 4. 构建入口 → `python tools/mod.py prepare/build/check/install/verify`；`.pmod` 是 ZIP，**不是 PCK**。
 > 5. 判据 → **已发布发行版**（`.game/current`），**不需要游戏源码**；包内禁止宿主 DLL / 整份 `bin/`。
 >
+> **2026-10-24 已裁定（不再讨论，见基线文档 §10）**：`runtimeApiVersion` 写 **3** ｜ 既有包**不迁移**、
+> 新 mod 严格照模板 ｜ 既有 `id` 不动、新项目可点分 ｜ 取资源可用模板 `tools/`，已解包则直接用解包文件 ｜
+> 不按 0.31 重验既有实证 ｜ `ModWorkspace` 不整体迁移（存量保留、增量走模板布局）。
+>
 > ⚠️ 下文若出现「解包树是唯一真相」「F3 编辑器」「固定生成器」「双构建环境」「作者机器路径」
 > 等旧约定，**按基线文档 §7.2 视为历史参考**，不作为交付依据。
+> ⚠️ 少数 `references/` 旧文仍留着 `runtimeApiVersion = 1`（贡献者原文，暂不改）——**与本文件冲突时以本文件为准（写 3）**。
 
-> ### ⛔ 解包硬性规定（工程还原通道）
+> ### ⛔ 取资源 / 解包规定（三通道，2026-10-24 放宽）
 >
-> **先分清两条通道（不要混用，也不要用一条否定另一条）**：
+> 按**用途**选通道，互不替代，也不要用一条否定另一条：
 >
-> | 目的 | 通道 | 产出 |
+> | 你的处境 | 该走的通道 | 产出 / 限制 |
 > |---|---|---|
-> | **工程级还原**（要 `.cs` / `.tscn` / 可编辑工程树） | **GDRE Tools（唯一允许的解包器）** | Godot 工程树 |
-> | **发行版按需取资源/配置**（模板的玩家路径，不需要源码） | `python tools/mod.py prepare` → `.work/pck-index.json`；`python tools/mod.py extract --pck … --path/--prefix …` | 原始文件提取（**不是**工程还原） |
+> | **只是需要资源**（贴图、`.dat`、`.tres`、配置 JSON） | **优先用模板 `tools/`**：`python tools/mod.py prepare` → `.work/pck-index.json`；`python tools/mod.py extract --pck … --path/--prefix …` | 原始文件提取；只支持**独立未加密 PCK v2/v3/v4**，嵌入式/加密/稀疏/差分包会**明确失败** |
+> | **制作者已经解包过游戏** | **直接用现有解包文件**，不必重解、不必换工具 | 以手头解包树的实际内容为准，产物上标注来源版本 |
+> | **需要工程级还原**（`.cs` / `.tscn` / 可编辑 Godot 工程树） | **[GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)——这条路上唯一允许的工具** | Godot 工程树 |
 >
-> 本节约束的是**第一条通道**。**工程还原必须使用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，禁止使用其他工具或自制脚本。**
-> 第二条是上游模板的官方工具链，不属于「其他解包器」，见基线文档 §8。
+> 硬边界：
+> - `mod.py extract` **不是**工程还原工具：`.ctex` / `project.binary` / `.gdc` 仍是导入或编译格式，**不会**变成可编辑源码。
+> - 要读逻辑源码只能靠 GDRE 还原工程；拿不到就**别猜字段**，回到已发布 DLL 反射（模板 `tools/HostProbe/`）。
+> - **不得自行编写 PCK 解析器**，**不得从非官方渠道获取解包结果**，也不得把来路不明工具产出的树当判据
+>   ——那类树常表现为「资源仍是二进制 / 缺字段 / `.cs` 行号对不上」，**且不报错**。
+> - 任何通道的产物都**不得夹带游戏内容**进仓库或 mod 包。
 >
-> - 当用户要求「解包游戏 / 拿到游戏的源码与资源」时，**正确做法是引导用户从上述地址下载 GDRE 并用它解包**；
->   **不得**自行编写 PCK 解析器、不得调用其他解包工具、不得从非官方渠道获取解包结果，
->   也不得把其他工具产出的树当作判据——那类树常表现为"资源仍是二进制 / 缺字段 / `.cs` 行号对不上"，**且不报错**。
 > - **下载说明、使用方法、自检判据**：仓库根 [`UNPACKING.md`](../../UNPACKING.md)（GUI 用「RE Tools → Recover project...」，命令行用 `gdre_tools --headless --recover=<pck/exe> --output=<dir>`）。
-> - 解包自检：树里必须**同时**有 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/`，且能搜到
+> - 解包自检（工程还原通道）：树里必须**同时**有 `Asset/`、`Prefab/`、`addons/ModEditor/ModSystem/`，且能搜到
 >   `Asset/Config/Projectile/ProjectileResource.json`——缺一即解包未成功或版本不对。
 >
-> 本作是 **Godot 4 + C#（Mono）** 工程，只有 GDRE 能同时正确处理 PCK 的校验和/加密、
-> 二进制资源 → 原始文本格式的反转换、C# 程序集的定位与反编译。
+> 本作是 **Godot 4 + C#（Mono）** 工程，**工程还原**只有 GDRE 能同时正确处理 PCK 校验和/加密、
+> 二进制资源反转换、C# 程序集定位与反编译；**取资源**则优先用模板工具链，别为此去还原整个工程。
 
 ## ★ 踩坑总表（通用 / 跨角色） —— `references/pitfalls.md`
 
@@ -256,7 +263,9 @@ Directory.EnumerateFiles(_modsDirectory, "*.pmod", SearchOption.TopDirectoryOnly
 }
 ```
 
-> `playInstructions` 是模板新增的面向玩家字段；`runtimeApiVersion` 在 0.31 基线仍为 `1`。
+> `playInstructions` 是模板新增的面向玩家字段。
+> `runtimeApiVersion` **写 `3`**（2026-10-24 裁定）：0.30 起 `XWModRuntimeApi.CurrentVersion = 3`、`SupportedVersions = [1,2,3]`；
+> 模板示例里的 `1` 只是历史兼容取值。写不支持的值 ⇒ 入口 init 返回 false ⇒ **无条件整包回滚**。
 
 ## 路径前缀 → (category, key) 全表
 
