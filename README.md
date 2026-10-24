@@ -10,6 +10,14 @@
 
 一套面向《植物大战僵尸杂交版》（Godot 4 + C#）Mod 开发的 **WorkBuddy Agent Skills（AI 技能包）**，由三个互相衔接的技能组成：一个覆盖 `.pmod` 包格式的通用底座，加上植物、僵尸两条端到端的专用流水线。全部内容来自真实项目的反复实测——每条"铁律"都对应一次踩坑，每个坑都附了根因与源码级证据。
 
+> 🏛 **上游基线（2026-10-24 对齐）：[axh-xecoy/pvzhe-mod-template](https://github.com/axh-xecoy/pvzhe-mod-template)。**
+> 本仓库三个技能的**流程 / 字段契约 / 身份 / 版本 / 构建 / 安装 / 验证 / 目录**一律以上游模板为准；
+> **重复或冲突一律以模板为准**，本仓库只保留模板未覆盖的**实测细节**。
+> 关键差异：`schemaVersion: 3`（原 2）· `version` 用 **SemVer 三段** · 构建走 `tools/mod.py` ·
+> 判据来自**已发布发行版**而非游戏源码 · 包内禁止宿主 DLL。
+> 全文与冲突/废弃对照见
+> [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md)。
+
 > 🚀 **第一次用？直接从 [GETTING_STARTED.md](GETTING_STARTED.md) 开始**——跑通官方样板「超级机枪射手」，再改一个数值做出你的第一个 Mod（约 30–60 分钟；需一份游戏解包目录，首次演练前请让 agent 按 `tools/README.md` 完成路径适配）。
 
 ---

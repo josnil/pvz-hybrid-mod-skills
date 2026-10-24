@@ -113,7 +113,7 @@ RequireReference(manifest, "CharacterSprite", key);   // 查不到 → throw →
 | `Localization/translations.csv` | 翻译（**仅编辑器可见**，见下） | ❌ |
 | `Runtime/ModAssembly.dll` | 托管插件（只有需要时才放） | ❌（但要进 `resources` 列表） |
 
-> ★★★ **包内这个文件名不许改**，但 `.csproj` 的 `<AssemblyName>` **必须 = 本 Mod 的 `<Key>`**（安卓要求主程序集名唯一）⇒ `plant-runtime-plugin.md` §1.1。
+> ★★★ **包内这个文件名不许改**，但 `.csproj` 的 `<AssemblyName>` **必须 = 本 Mod 的 `id`**（安卓要求主程序集名唯一）⇒ `plant-runtime-plugin.md` §1.1。
 
 ## 11. ⚠️ 翻译表是「编辑器专用」
 
@@ -129,3 +129,38 @@ RequireReference(manifest, "CharacterSprite", key);   // 查不到 → throw →
 （对应 `ModExporter.ShouldPackageProjectFile`）。
 
 ⚠️ `.cs` 被排除、但 `IsExecutablePackageFile` **认**它 ⇒ 包内**绝不能**有 `.cs`，否则整包拒收。
+
+### ★ mod 植物要能被「全息投影花盆」投影 ⇒ config 必须是 `canCopy = true`
+
+**全息投影花盆 = 内置植物 `PlantPotQX`**（`TOWERDEFENSE_PLANT_POTQX_NAME` → 「全息投影花盆」，
+`Asset/Anime/Character/Plant/Star/PotQX/`）。它的投影入口是
+`TowerDefensePlantPotQX.CreateHologramCharacter()`（开盆动画 `Open` 播完时触发），
+取**本格**角色列表按四条筛选：
+
+```csharp
+item != this
+ && item.config.canCopy                                     // ★ 为 false 就永远不投影
+ && item.camp == base.camp                                  // 同阵营
+ && item.config.plantGridOverrideType == PLANTGRIDTYPE.NOONE // 不是「占槽位」的植物
+```
+
+再对每个候选取卡（`GetPacketConfigReadOnlyByCharacterName(config.name)` → 找不到退
+`GetPacketConfig(config.name)`），然后**遍历同列的其它行**逐格 `CanPacketPlant(packet)` 种一份
+全息副本（副本会 `SetSpriteGroupShaderParameter("hologram", true)` +
+`instance.hologram = true` + `canBeCollection = false` + 释放该格占用）。
+
+⚠️ **三个字段的默认值都很关键**（`TowerDefenseCharacterConfig.cs`）：
+| 字段 | 默认 | 影响 |
+|---|---|---|
+| `canCopy` | **`true`**（`:40`） | **不写就是 true**；但生成器模板若显式写 `canCopy = false`，该植物**永远不被投影** |
+| `plantGridType` | `[GROUND, POT, LILYPAD]`（`:107`） | 决定能种在哪；缺 `POT` 就种不到花盆上 |
+| `plantGridOverrideType` | `NOONE`（`:115`） | 非 `NOONE` 会被投影筛选直接排除 |
+
+**★ 2026-09-30 实测踩坑**：本工坊 `SuperGatlingPea` 的 config 里被写死 `canCopy = false`
+⇒ 放在全息投影花盆上**完全不投影**（而同工坊 `UltimateCherryGod` 没写这行、走默认 `true`，
+本身是合规的）。修法就一行：`canCopy = false` → `true`，然后按 **SemVer `PATCH` +1** 重编重打包
+（四段时代的 `+0.0.1.0` 口径已作废，见 `pvz-hybrid-mod-authoring` 的「版本号规范」）。
+
+**排查顺序**（投影不生效时）：① `canCopy` ② `plantGridOverrideType` ③ 同阵营 ④
+`config.name` 能否查到卡 → ⑤ `CanPacketPlant`（地形/槽位/冰盖等，见
+`TowerDefenseCellInstance.CanPacketPlant`）。

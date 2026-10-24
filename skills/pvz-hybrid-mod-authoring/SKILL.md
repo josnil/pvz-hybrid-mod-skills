@@ -18,9 +18,33 @@ agent_created: true
 > **「假修复」（构建成功 ≠ 代码进去了）**、**共享组件文件改动不触发重编译**。
 > 其中多数坑**与版本无关**，做任何新 Mod 都会遇到。
 
-> ### ⛔ 解包硬性规定（第一步，不可绕过）
+> ## 🏛 官方模板基线（最高优先级 · 2026-10-24 对齐）
 >
-> 本技能的一切判据都来自**解包树**。**解包必须使用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，禁止使用其他工具或自制脚本解包。**
+> 本技能的**流程 / 字段契约 / 身份 / 版本 / 构建 / 安装 / 验证 / 目录**一律以
+> [pvzhe-mod-template](https://github.com/axh-xecoy/pvzhe-mod-template) 为准。
+> **重复或冲突一律以模板为准**；本技能只保留模板未覆盖的**实测细节**（数值、字段类型、管线现象）。
+>
+> 速记五条 —— 全文与冲突表见 [`references/official-template-baseline.md`](references/official-template-baseline.md)：
+> 1. `mod.json` → **`schemaVersion: 3`**（不是 2）；宿主接受 1–3，**新包一律写 3**。
+> 2. `version` → **SemVer 三段**（默认 `0.1.0`，≤32 字符），见 §「版本号规范」。
+> 3. `id` → `[0-9a-z_.-]`，1–32 位（点/短横线合法）；**已有项目加功能不改 id**。
+> 4. 构建入口 → `python tools/mod.py prepare/build/check/install/verify`；`.pmod` 是 ZIP，**不是 PCK**。
+> 5. 判据 → **已发布发行版**（`.game/current`），**不需要游戏源码**；包内禁止宿主 DLL / 整份 `bin/`。
+>
+> ⚠️ 下文若出现「解包树是唯一真相」「F3 编辑器」「固定生成器」「双构建环境」「作者机器路径」
+> 等旧约定，**按基线文档 §7.2 视为历史参考**，不作为交付依据。
+
+> ### ⛔ 解包硬性规定（工程还原通道）
+>
+> **先分清两条通道（不要混用，也不要用一条否定另一条）**：
+>
+> | 目的 | 通道 | 产出 |
+> |---|---|---|
+> | **工程级还原**（要 `.cs` / `.tscn` / 可编辑工程树） | **GDRE Tools（唯一允许的解包器）** | Godot 工程树 |
+> | **发行版按需取资源/配置**（模板的玩家路径，不需要源码） | `python tools/mod.py prepare` → `.work/pck-index.json`；`python tools/mod.py extract --pck … --path/--prefix …` | 原始文件提取（**不是**工程还原） |
+>
+> 本节约束的是**第一条通道**。**工程还原必须使用 [GDRE Tools（gdsdecomp）](https://github.com/GDRETools/gdsdecomp/releases)，禁止使用其他工具或自制脚本。**
+> 第二条是上游模板的官方工具链，不属于「其他解包器」，见基线文档 §8。
 >
 > - 当用户要求「解包游戏 / 拿到游戏的源码与资源」时，**正确做法是引导用户从上述地址下载 GDRE 并用它解包**；
 >   **不得**自行编写 PCK 解析器、不得调用其他解包工具、不得从非官方渠道获取解包结果，
@@ -32,19 +56,32 @@ agent_created: true
 > 本作是 **Godot 4 + C#（Mono）** 工程，只有 GDRE 能同时正确处理 PCK 的校验和/加密、
 > 二进制资源 → 原始文本格式的反转换、C# 程序集的定位与反编译。
 
+## ★ 踩坑总表（通用 / 跨角色） —— `references/pitfalls.md`
+
+本项目开发过程中**实际踩过**的坑，已统一成「**现象 · 触发场景 · 原因 · 正确做法**」四段式。
+**开工前先扫一遍；出问题时先 Ctrl-F 现象里的一句话**（如「零日志」「假绿」「整包被拒」「原地滑步」）。
+
 ## 前提认知（别搞错）
 
 - 游戏内置的 **「PVZ Mod 编辑器」是个游戏内 GUI**，由 **F3** 唤起（autoload `ModEditorManager`），
   完整打包在 `addons/ModEditor/`（3582 文件 / 574 cs）。**AI 无法驱动它**。
 - 但它的产物 `.pmod` **只是一个 zip + 根 `mod.json`**，可以纯脚本手写生成。这是本技能的核心。
+- ⚠️ **上游模板不使用游戏内编辑器**，并在提取本仓库内容时明确删除了「F3 / 编辑器打开流程」
+  与「工程目录（`.pvzmodeproject` + 72 标准目录）」等约定（基线文档 §7.2）。
+  ⇒ **不要把 F3 或工程目录当作交付前置**；面向他人交付时只走
+  `tools/mod.py prepare → build → check → install → verify`。
 
 ## 关键路径（按需查证）
 
+> ⚠️ 下表是**本地历史工作区**的查证入口，**不是他人可复用的前置条件**（基线文档 §7.1 第 4、10 条）。
+> 面向他人交付时，判据只能来自**已发布发行版**：`python tools/mod.py prepare` 导入 `.game/current`，
+> 编译引用取 `.work/references/`，资源按需 `tools/mod.py extract`。
+
 | 用途 | 路径 |
 |---|---|
-| 源码真相 | `D:\zzz\pvzHE\解包\植物大战僵尸杂交版V0.28\addons\ModEditor\ModSystem\` |
+| 源码真相（**仅本机历史快照，可选**） | `<本机解包树>/addons/ModEditor/ModSystem/`（本机实测为 0.28 快照） |
 | 包格式 | `ModExporter.cs`（打包）/ `ModLoader.cs`（加载，71KB）|
-| 清单字段 | `XWModManifest.cs`（schemaVersion=2）|
+| 清单字段 | `XWModManifest.cs`（**模板基线 `schemaVersion = 3`**；宿主接受 1–3）|
 | 类别派发 | `XWModRuntimeRegistry.cs` → `TrySetRuntimeValue` |
 | 路径→类别推断 | `ModLoader.InferRuntimeEntry` |
 | 工程目录约定 | `XWModProjectLayout.cs`（全部 `Resources/*` 目录名）|
@@ -98,7 +135,7 @@ pvz-hybrid-mod-skills-main/       <- 技能仓库完整目录（skills/ + tools/
 - 实现：先 `copytree` 各顶层目录到临时目录（顺便补 `dist/`），
   再用 `zipfile.ZipFile(tmp, "w", ZIP_DEFLATED)` 按 `relpath` 写入，最后删临时目录。
 - 文件名建议 `杂交版Mod制作-打包-YYYYMMDD-<mod1>-<mod2>.zip`（与参照包命名风格一致）。
-- **输出到用户真实桌面 `C:\Users\txgcs\DesktopNew\`**（不是 `C:\Users\txgcs\Desktop`）。
+- **输出到用户真实桌面**（注意桌面可能被重定向，见 §「已知坑」第 7 条）；不要把它们塞进解包树或仓库目录。
 
 ### ★★ 「全量包」vs「单包」——先问清楚再动手（2026-09-30 定案）
 
@@ -132,11 +169,16 @@ pvz-hybrid-mod-skills-main/       <- 技能仓库完整目录（skills/ + tools/
 
 ```
 Xxx.pmod                          # zip, ZIP_DEFLATED
-├── mod.json                      # 必须【根】且【唯一】，≤ 1 MiB
+├── mod.json                      # 必须【根】且【唯一】，≤ 1 MiB；schemaVersion = 3
 ├── Resources/Projectiles/A.tres  # 路径前缀决定类别，文件名=key
 └── Runtime/ModAssembly.dll       # 只有托管插件才需要；路径是硬编码字面量（**不许改**），见「托管代码 Mod」节
-                                  #   ⚠️ 但 csproj 的 <AssemblyName> 必须是**本 Mod 自己的键**（安卓要求唯一）
+                                  #   ⚠️ 但 csproj 的 <AssemblyName> 必须是**本 Mod 的 `id`**（安卓要求唯一）
 ```
+
+> **允许名单制（模板口径）**：包内只许 `mod.json` + `Runtime/ModAssembly.dll` + 你在
+> `mod.json.resources` 里**显式列出**的自有资源。
+> **禁止**把 `GodotSharp.dll`、`PlantsVsZombies.dll`、游戏 DLL、整份 `bin/` 或整份解包内容打进包
+> —— 模板排错清单把「ZIP 内有 `GodotSharp.dll` / `PlantsVsZombies.dll`」直接列为入口加载失败原因。
 
 打包时**排除**：`.uid` `.import` `.cs` `.csproj` `.sln` `.build/` `bin/` `obj/`
 （对应 `ModExporter.ShouldPackageProjectFile`）。
@@ -190,14 +232,20 @@ Directory.EnumerateFiles(_modsDirectory, "*.pmod", SearchOption.TopDirectoryOnly
 
 ## mod.json 最小可用（纯资源 Mod）
 
+> **契约以模板为准**：`schemaVersion` 写 **3**；`version` 用 **SemVer 三段**；
+> `id` 为 `[0-9a-z_.-]` 1–32 位（点、短横线合法）。
+> ⚠️ **既有 Mod 的无分隔 id（如 `supergatlingpea`）保持不变** —— 改 id 会破坏启用配置、
+> 依赖、资源身份与存档，必须按迁移评估处理（基线文档 §3、§10 第 3 条）。
+
 ```json
 {
-  "schemaVersion": 2,
-  "id": "peaoverhaul",
+  "schemaVersion": 3,
+  "id": "example.pea-boost",
   "name": "豌豆强化",
   "version": "1.0.0",
-  "author": "云漫行",
+  "author": "示例作者",
   "description": "...",
+  "playInstructions": "在 Mod 管理中启用后重启游戏。",
   "dependencies": [], "conflicts": [],
   "provides": {},
   "overrides": { "Projectile": ["PeaDefault", "SnowPea"] },
@@ -207,6 +255,8 @@ Directory.EnumerateFiles(_modsDirectory, "*.pmod", SearchOption.TopDirectoryOnly
   "resources": ["Resources/Projectiles/PeaDefault.tres"]
 }
 ```
+
+> `playInstructions` 是模板新增的面向玩家字段；`runtimeApiVersion` 在 0.31 基线仍为 `1`。
 
 ## 路径前缀 → (category, key) 全表
 
@@ -268,6 +318,40 @@ Directory.EnumerateFiles(_modsDirectory, "*.pmod", SearchOption.TopDirectoryOnly
      **零文件的空壳** → 归我们；其它一律跳过不动。隐藏文件当标记会「被增量清理删掉→再写」来回抖动，
      而且标记一丢就**永久静默跳过**（用户以为更新了，其实镜像还是旧的）。
 
+## 版本号与更新日志（★ 每个 mod 都要有；2026-09-30 补，因踩过"8 轮迭代一直挂 1.0.0.0"）
+
+**症状**：mod 连着改了七八轮（换素材、结构重做、修一堆 bug），`mod.json.version` 一直是
+脚手架时写死的 `1.0.0.0` ⇒ **同一个版本号对应至少 8 个不同构建**，拿包的人无法判断新旧，
+出问题也无法用版本号复现。
+
+**为什么游戏不报错**（所以容易被忽略）：`version` 在本作里**不参与依赖解析与排序** ——
+`XWModEnvironmentService` 只是把它带进**环境快照**（用于比对"这个 mod 的版本变了"），
+空版本还会回落到 `"1.0.0"`（`ModLoader.cs:1607-1609`）。**不改能跑，但标识作用全失。**
+
+**四条必须同步**（缺一块就会再次腐烂）：
+
+1. **生成器常量** `VERSION = "MAJOR.MINOR.PATCH.BUILD"` + `CHANGELOG = [(版本, 日期, [条目…]), …]`
+   （新版本写在**列表顶部**）。
+2. `mod.json` 的 `version`、`.pvzmodeproject` 的 `Version` —— **都从常量取，别手改生成的 json**。
+3. **包内写 `CHANGELOG.md`**（会一起进 `.pmod`，拿到包的人直接能看到版本历史与规则说明）。
+4. **自检断言三处一致**：`VERSION == CHANGELOG[0][0]`、`mod.json` 与 `.pvzmodeproject`
+   的版本都等于常量、包内 `CHANGELOG.md` 存在 —— **不一致直接 FAIL**。
+   ⚠️ 这两个文件的**写盘要排在 `self_check()` 之前**（自检是"读磁盘"口径，否则首跑必 FAIL）。
+
+**递增规则**：见 [★ 版本号规范（semver 2.0.0）](#-版本号规范semver-2002026-10-17-定稿全-mod--全交付面统一)。
+格式一律 **三段 `MAJOR.MINOR.PATCH`**（第 4 段已退役，不要再写 `1.0.5.0`）。
+
+**两个附带坑**：
+
+* `.pvzmodeproject` 的 `LastModifiedDate` **必须每次构建刷新**。反面写法
+  `modified = (existing or {}).get("LastModifiedDate") or now` 会让时间戳
+  **永远停在首建那一刻**（`CreatedDate` 才该沿用）。
+* **幂等校验要对时间戳归一化**：`LastModifiedDate` 每次都会变 ⇒ 逐字节比对必然"假红"。
+  做法：哈希前用正则把 `"CreatedDate|LastModifiedDate": "…"` 替换成占位符。
+* 别在生成器里写 3 段式（`"1.0.0"`）而手上包是 4 段式（`1.0.0.0`）—— 同一工坊的兄弟包
+  已经出现过这种不一致（生成器写 `1.0.0`、`mod.json` 里是 `1.0.5.0`，说明版本是**手改**上去的）。
+  统一交给常量。
+
 ## 标准流程
 
 1. **查键**：读 `Asset\Config\<类>\<类>Resource.json` 拿真实 key（键就是里面每个 JSON key）
@@ -277,8 +361,11 @@ Directory.EnumerateFiles(_modsDirectory, "*.pmod", SearchOption.TopDirectoryOnly
 5. **打包**：`mod.json` 写在第 0 个 zip 条目
 6. **装到** `%APPDATA%\Godot\app_userdata\植物大战僵尸杂交版\Mods\`
 7. **离线校验**：跑 `verify_pmod.py`（结构 / 路径安全 / 键存在性 / UID / ext_resource 存在性）
-8. **交用户游戏内确认**：F3 → Mod 工具 → 启用 → **应用已安装 Mod 到当前游戏**
-   （提示文案：「状态已保存；请使用"重新应用 Mod"，或重启游戏后生效」）
+8. **安装并在 Mod 管理里启用后重启**（模板口径）：
+   `python tools/mod.py install --mods-dir "$env:APPDATA\Godot\app_userdata\植物大战僵尸杂交版\Mods"`
+   → 打开 Mod 管理**启用** → **重启游戏** → 用本次 `logs/godot.log` 跑 `python tools/mod.py verify --log <log>`。
+   - **复制文件本身不会启用 Mod**；也**不要手工覆盖 `enabled_mods.json`**（模板明令）。
+   - 旧路径「F3 → Mod 工具 → 应用已安装 Mod」属**游戏内编辑器流程**，模板已删除，仅作历史参考。
 
 ## 常见字段速查（TowerDefenseProjectileConfig）
 
@@ -485,7 +572,42 @@ water = ImageOps.colorize(gray, black=DARK, mid=MID, white=HIGH)
    `UnlockConditionPacketBankCategoryPacketUnlockNumConfig` 会被判
    「必须使用 Mod 专属解锁条件」→ throw。写 `unlockCheckList = []` = 直接可用。
    * 另外：**`provides` 是 all-or-nothing** —— 里面每个键都必须真的注册得上
-     （`ValidateManifestRegistrations`），多写一个不存在的键也会整包失败。
+     （`ValidateManifestRegistrations`，`ModLoader.cs:1519-1545`），多写一个不存在的键也会整包失败；
+     失败后果 = `XWModManager` 打 `failed to apply enabled package: <id>` ⇒ **整包不生效**。
+     ★★★ **每个键的「注册来源」只有两种**，必须逐键自问「谁来注册它」：
+     ① 包内有文件能被 `InferRuntimeEntry` 推成该 `(category, key)`
+        —— **唯一权威前缀表 = `ModLoader.cs:1070-1088` 的 17 项**；
+     ② 运行时入口在 `Initialize` 里调 `XWModRuntimeContext.TryRegister`
+        （运行时入口**先于**校验执行：`ModLoader.cs:672` vs `:678`）。
+     ★★★ **最容易踩的具体实例（2026-10-02 实机失败）**：
+     **Packet 只能由 `Resources/Cards/<Key>.tres` 注册**；
+     包内 `Resources/Characters/Zombies/<Key>/Packet/<Key>.tres` **只是镜像、不参与注册**。
+     若一个包里有 3 个角色（1 个主动 + 2 个被召唤），`provides.Packet` 写了 3 个键却只发了 1 张卡 ⇒
+     `required manifest runtime entry is not registered: <id>: provides: Packet/<Key>` ⇒ 整包不生效。
+     **规则：`provides.Packet` 有几个键，就必须有几张 `Resources/Cards/<key>.tres`，一一对应**
+     （先例：向日葵女王僵尸 = 召唤者 + 被召唤物 = 2 角色 2 卡）。
+     ★ **`Resources/Animations/`、`Resources/Characters/...` 里的 `Config/ HitBox/ ComponentSet/` 都不在归类表里**，
+     但 `IsCharacterPackageDependency`（`ModLoader.cs:1306-1315`，`Resources/Characters/<类别>/...` 且段数≥5）
+     与 `IsAnimationAtlasPackageDependency` 会**豁免它们的 diagnostic**，而 `Resources/Animations/` **不被豁免**
+     （只会攒一条 diagnostic，**成功时不打印**，见下）。
+   * ★★ **`unsupported package file` 不是「良性噪音」，它是失败证据**：
+     `XWModManager.cs:932-934` **只在 `ApplyMod` 返回 false 的失败分支**里
+     `foreach (diag in loadedMod.Diagnostics) GD.PushWarning(...)` ——
+     包一成功，**一条诊断都不打**。
+     ⇒ 日志里出现 `unsupported package file` / `required manifest runtime entry is not registered`
+     ⇒ **该包已经 apply 失败**，不是「无关告警」。
+   * ⚠️ **别只 grep `ERROR`**：`ApplyMod` 失败是 **WARNING**。判据是这两条**计数行**：
+     `package applied: <id>; resources=N` 与 `enabled runtime apply complete: n/N packages`
+     （`n` 必须等于 `N`；`N` = 启用的包数）。`resources=N` 的含义 = 该包被注册成功的绑定数
+     （例：1 角色 3 件套 = 3；1 角色 + 1 精灵 + 1 卡 = 3；11 段蛇 = 11+11+1 = 23）。
+   * ⚠️ **「有卡（`Resources/Cards/`）」≠「选卡界面能选」**：引擎**不合并** Mod 注册进卡表
+     （`ResourceManager.BuildExpandedPacketBanks:638-647` 只从内置 `PacketBankResource.json` 构建；
+     `TowerDefenseBattleFeaturePacketBank.CategoryChooseAsync:509-514` 是
+     `packetBankData.category[分类]` **直读**）。Mod 卡的**自动**去处只有**图鉴**的僵尸页
+     （`Almanac.cs:427` → `XWModContentCatalog.GetPackets(plants:false)`；植物侧 `WithPlants(plants:true)` 只收植物）。
+     ⇒ 想让卡出现在**选卡界面**，必须由插件主动往卡库实例 append
+     （先例：`runtime_src_zombie_super_gatling/SuperGatlingPaperRuntimeEntry.cs` 第四/五节，
+     补进共享卡库 `GeneralZombie` 的 `Zombie` 分类；日志会打「已把「…」补进卡库…」）。
    * **通常不需要伴生托管程序集**：`CharacterRequiresCompanion` 只在场景根带
      meta `mod_character_script_binding = "CompanionOnly"` 时为真。
      复用原版 `.cs` → `runtimeAssembly` 留空即可（`TryInstantiateEffectiveCharacter` 会失败并
@@ -513,10 +635,17 @@ water = ImageOps.colorize(gray, black=DARK, mid=MID, white=HIGH)
 * `resources=N` = **真的注册了几条**（角色包只有 `Scene`/`Sprite`/`Cards` 三条会注册，
   其余 `Config`/`Packet/`/`ComponentSet` 算「角色包依赖」不注册 —— 所以 N=3 是**正常的**）。
 * `extracted (7 files)` = zip 条目数 − `mod.json`。
-* `diagnostics=1` 通常是 `Localization/translations.csv` 被判 unsupported（**不致命**）。
-* `N/N packages; rollbackBlocked=False` = 没有任何一包被回滚。
+* `diagnostics=N` 只是**计数器**（`Localization/translations.csv`、`Resources/Animations/*` 常计入），
+  **成功时一条都不会打印** —— 所以别把「计数 > 0」当问题，也别把「日志里没看到它们」当异常。
+  ★ 反过来：**日志里真看到 `unsupported package file` ⇒ 这个包已经 apply 失败**
+  （`XWModManager.cs:932-934` 只在失败分支转储诊断）。
+* `N/N packages; rollbackBlocked=False` = 没有任何一包被回滚。**`n` 必须等于 `N`**（`N` = 启用的包数）。
 * 反例：出现 `... is not unambiguously declared by manifest` / `saveKey 与注册键不一致` /
   `缺少 CharacterSprite/...` → 整包被拒，按上面 8 条闸门对号入座。
+* ★★ 反例（**最隐蔽**）：`required manifest runtime entry is not registered: <id>: provides: <类别>/<键>`
+  ＋ `failed to apply enabled package: <id>` ⇒ `provides` 里某个键**没有注册来源**。
+  最常见成因 = **Packet 少发了 `Resources/Cards/<Key>.tres`**（包内 `Characters/.../Packet/` 不算数）。
+  ⚠️ 此时插件仍会打自己的 `运行入口已初始化`（运行时入口先于校验执行）⇒ **不要因为插件日志正常就排除这种可能**。
 
 ### 一个植物 Mod 由 6 个文件组成（样板见 `.workbuddy/ModWorkspace/SuperGatlingPea/`）
 
@@ -535,6 +664,54 @@ water = ImageOps.colorize(gray, black=DARK, mid=MID, white=HIGH)
 三者键都正好是 `<Key>`（不是 `<Key>Packet`）—— 因为 `saveKey` 必须 == 注册键，而
 `characterConfig.name` 必须 == 场景键，统一成 `<Key>` 才能同时满足。
 **都走 `provides`**（新键），同 (类别,键) 重复 → `ambiguous`。
+
+#### ★ 换皮植物选基底：优先挑「**没有自定义 `ComponentSet`**」的那种（2026-09-29 横向实测）
+
+换皮植物先要跑通，基底越"裸"越好 —— 因为 `ComponentSet` 配错是**零日志**的（排查极痛）。
+在 `Asset/Anime/Character/Plant/<分类>/` 横向比了一轮（V0.29）：
+
+| 基底 | 组件情况 | 评价 |
+|---|---|---|
+| **`Wallnut`** | **没有 `*ComponentSet.tres`** ⇒ 吃默认植物组件集；无攻击/生产/爆炸/槽位组件 | ✅ 最干净，推荐 |
+| `LilyPad` | 1 个 `LilyPadSlotComponentDefinition`，但定位是"承载"且**水面专属** | ⛔ 种植位置受限 |
+| `PotatoMine` / `Squash` | 带 `AttackComponent` / `ExplodeDefinition` / 专属组件 | ⛔ 会打僵尸、会自毁，副作用不可控 |
+| `Imitater` | 带 `.cs` 模仿逻辑（`ImitaterSprite.cs`） | ⛔ 逻辑太杂 |
+
+判据一句话：**`ls <植物>/Scene/` 里有没有 `*ComponentSet.tres`；没有 = 最裸。**
+（⚠️ 像 `Wallnut` 那样另外带 `DamagePoint/` 目录是**无害**的：它只管受击分档，不复制也只是"永远停在第 0 档"。）
+
+复刻一份要改的只有三处（其余 `res://` 路径按包内布局重写）：
+
+- ★★ **包内资源之间一律用「相对路径」互相引用**（`./X.tres`、`../Config/X.tres`、
+  `../../../../../Resources/Animations/X.tres`）—— 只有**引擎/游戏内置**资源才写 `res://`。
+  这条照**现成能跑的包**抄（本项目 `ModWorkspace/SuperGatlingPea/` 是唯一真源模板）；
+  写错不会报错，只是资源闷声解析不到。
+- ★★ **场景根必须带 `metadata/mod_resource_kind`**（主场景 `"Character"`、精灵场景 `"CharacterSprite"`），
+  并配 `metadata/mod_display_name` / `mod_character_category = "Plant"` /
+  `mod_character_config_path` / `mod_character_sprite_scene`
+  ⇒ **这是 ModLoader 归类 Mod 内容的依据**（包清单里的 `provides` 是另一层，两者都要）。
+  ⚠️⚠️ **`metadata/*` 必须落在「根节点那一行的属性块」里，不能追加到文件末尾**：`.tscn` 里
+  `[node ...]` 是按顺序排的，`s.rstrip() + "\n\nmetadata/..."` 这种朴素追加会把它挂到**最后一个子节点**
+  （如 `GroundSlot`）上 ⇒ 归类失效、**静默不报错**。正确做法是插在两个 `[node ` 之间：
+  `f1=s.find("[node "); f2=s.find("\n[node ", f1); s=s[:f2+1]+meta+s[f2+1:]`，
+  并加断言复核 `root < s.find("metadata/mod_resource_kind") < child`。
+  ⇒ 这条对**主场景与精灵场景都要做**（精灵场景根节点后面通常紧跟子节点，最容易被追加错）。
+- ★ `.tres` 里的 `name` / `describe` / `handbook*` **可以直接写中文字面量**（不必走本地化 key，
+  也就不必带 `Localization/translations.csv`）；`unlockCheckList = []` 一定要置空。
+- `Scene/<Key>.tscn`：`config` / `sprite` / `script` 三处引用；`sprite = NodePath("SpriteGroup/TransformPoint/<精灵名>")`
+  ⚠️ **NodePath 必须与子节点完整路径逐字相等**（多套一层 ⇒ 静默失效，见工坊铁律 ②）。
+  根节点是 `res://Prefab/TowerDefense/Character/TowerDefensePlant.tscn` 的实例，子节点 = `SpriteGroup/TransformPoint/<精灵>` + `ShadowSprite`。
+- `Config/TowerDefensePlant<Key>.tres`（`TowerDefensePlantConfig`）：★ **`name` 就是运行时识别键**
+  （`character.config.name`，插件按它认自己的植物）必须改；`hitpoints` / `cost` / `packetCooldown` /
+  `startingCooldown` / `maskFlags` / `physiqueTypeFlags` 按需。
+- `Packet/<Key>.tres`（`TowerDefensePacketConfig`）：`saveKey`（卡槽与判重用的键）必须改；
+  ★ **`unlockCheckList` 要置空** —— 否则会被"通关某关才解锁"卡住，选卡界面根本看不到；
+  `type` 决定卡片分类；`packetAnimeOffset` / `packetAnimeScale` 决定卡面构图。
+
+⚠️⚠️ **包只提供资源，卡池注入靠运行时**：现役样板 `SuperGatlingPeaRuntimeEntry.TryPatchCardBanks`
+在运行期把本卡塞进 `GeneralPlant.<分类>`（图鉴与选卡界面同源，所以不会"只在一边出现"）。
+⇒ 换皮植物**必须同时**做「注卡进卡池」与「按 `config.name` 认角色」两件运行时的事；
+只发资源 = 选卡界面里看不到这张卡。
 
 ### 费用 / 冷却 / 卡类型写在哪
 
@@ -1418,8 +1595,26 @@ override = SubResource("PacketOverride_direct_plant")
   ⇒ 插件拿到的是 `Head`（其父才是 body）。旧写法「`head = 传入节点.GetNodeOrNull("%Head")`」会让
   `body == head` ⇒ **自环、头身同步变空操作**。正确：先判 `node.Name == "Head"` 则 `body = node.GetParent()`，
   否则（拿到根）才 `%Head`。
-- 场景根**不带** `mod_character_script_binding="CompanionOnly"` 时**不需要伴生脚本**
-  （`CharacterRequiresCompanion` 只在带该元数据时才要求），走标准 `IXWModRuntimeEntry` 即可。
+- ★★ **场景根不带 `mod_character_script_binding="CompanionOnly"` 时不需要伴生脚本 —— 而"带"基本是错的**（2026-09-29 读源码定案）。
+  机制：`XWModCharacterCompanionRuntime.TryCreateInstance`（`addons/ModEditor/ModSystem/XWModCharacterCompanionRuntime.cs:160-245`）读场景根的两个元数据，
+  再 `Activator.CreateInstance(type)` 造一个 Node 顶掉原场景根。三条理由说明**不该走它**：
+  1. **失败是"资源级拒收"，不是"没效果"**：`ModLoader.cs:635-639` 对 `Category=="Character"` 的资源，
+     若 `CharacterRequiresCompanion(scene)`（= 根节点带那个元数据，`:984-990`）而 `TryCreateInstance` 返回 false
+     ⇒ **这张卡整个被丢掉**。而失败条件极易触发：`:185` 要求 **类型名 == 脚本文件的文件名**，
+     `:186` 还要求 `authoredRoot.GetType().IsAssignableFrom(type)`（必须派生自原场景根类型）。
+  2. **拿到的 Node 收不到引擎回调**：它由 `Activator.CreateInstance` 造出，只保证"构造函数会跑"；
+     而本工坊 csproj 用 `Microsoft.NET.Sdk`（无 Godot 源生成器）⇒ `_Ready`/`_Process`/`_GuiInput`/`_Draw` 不触发
+     （见下面那节）。**触发器植物的 `_Ready → CallDeferred` 范式正好踩在失效的那一类上。**
+  3. ⇒ 正解是**普通角色场景（不带该元数据）+ `IXWModRuntimeEntry` 每 N 帧扫场景**，
+     按 `config.name` 认自己的角色、按 **节点 `GetInstanceId()`** 认"新生成的那一个"。
+     现役样板：`runtime_src_plant/SuperGatlingPeaRuntimeEntry.cs`（`OnProcessFrame`→`ScanScene`→`ScanRecursive`
+     →`TryHookCharacter`，`:400/:449/:467/:941`）。
+  - ✅ **有用的例外（值得记）**：伴生脚本里**游戏自己声明的 virtual 方法仍然有效** ——
+    例如 `TowerDefensePlant.ExportVariantSave` / `ImportVariantSave`（`CubeBox.cs:261-278`），
+    它们是游戏代码用普通 C# 虚分发调的，**不经过 Godot 的 `InvokeGodotClassMethod`**。
+    ⇒ 「角色级存档状态位」这类需求用伴生脚本是**成立**的，只有"引擎回调"那类不行。
+  - ⚠️ 连带的运行时事实：`TowerDefenseCharacter` 是 Node ⇒ 用 `GetInstanceId()` 去重；
+    而 `CharacterComponentRuntime`（如 `FireComponent`）**不是** GodotObject ⇒ 只能 `ReferenceEquals`（见上）。
 
 ### ⚠️ 翻译表是「编辑器专用」
 
@@ -1584,10 +1779,11 @@ insertLayerId = 16
 ## 托管代码 Mod（已实测可用）
 
 `runtimeAssembly = "Runtime/ModAssembly.dll"` + `runtimeEntryType`（实现 `IXWModRuntimeEntry`）
-+ `runtimeApiVersion = `**宿主当前 API 版本**（**0.29.0 = `1`；0.30.0 = `3`**，随版本变，写错即整包回滚）
++ `runtimeApiVersion = `**宿主当前 API 版本**（0.30 实测 `XWModRuntimeApi.CurrentVersion = 3`，`SupportedVersions = [1,2,3]`；0.29 时代为 `1`）。**写不支持的值 ⇒ 入口 init 返回 false ⇒ 无条件整包回滚。**
 + `runtimeAssemblyPolicy = "required"|"optional"`，
-且 `schemaVersion` 必须 = 2（`XWModRuntimeCompatibility.ValidatePackage`）。
-运行期可调 `XWModRuntimeRegistry.Register(...)`，能拿到 `TowerDefenseManager` /
+且 `schemaVersion` ∈ **1–3**（**模板基线一律写 3**；`> 3` 抛 `unsupported mod schema version`）
+—— 托管入口校验见 `XWModRuntimeCompatibility.ValidatePackage`。
+  *模板示例 `mod.json` 写的 `runtimeApiVersion: 1` 属**兼容但非当前**取值；新包建议写 3。*运行期可调 `XWModRuntimeRegistry.Register(...)`，能拿到 `TowerDefenseManager` /
 `BattleEventBus` / `ResourceManager` / `ObjectManager`（`PVZApiRegistry` 暴露的 4 个类）。
 
 ### 什么时候非它不可
@@ -1733,6 +1929,90 @@ TowerDefenseManager.Instance.AddPacket("<卡key>", ov);     // 内部：GetSeedB
 `runtimeAssemblyPolicy: "optional"` ⇒ `IsRuntimeAssemblyRequired() == false`
 ⇒ 程序集加载失败**不连坐**整包（新 Mod 建议先 optional）。
 
+### ★★ 版本号规范（semver 2.0.0，2026-10-17 定稿，全 mod / 全交付面统一）
+
+#### ① 格式
+
+```
+MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
+```
+
+唯一合法正则（**与游戏加载器同一份**，见 `XWModLoadPlanVersion.cs:12`）：
+
+```
+^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+```
+
+> ⚠️ **为什么必须卡这条正则**：`mod.json` 的 `version` 本身只是个字符串（加载器不校验，
+> 空值回落到 `"1.0.0"`），但 **`dependencies[].versionRange` 的区间比较**走
+> `XWModLoadPlanVersion.Matches()` → `TryVersion()`，它用的就是上面这条正则。
+> 因此**四段版本 `1.0.5.0` 无法被解析 ⇒ 任何 `[1.0.0,2.0.0)` 形式的依赖区间都会静默失配**
+> （不报错、不加载、只表现为「依赖没生效」）。这是把四段版本全部迁到三段的真正理由。
+
+#### ② 各字段含义
+
+| 字段 | 含义 | 递增后 | 判断口径（本工坊） |
+|---|---|---|---|
+| `MAJOR` | 不兼容变更 | `MINOR`、`PATCH` 归零 | 改 `mod id` / 角色 key / 资源路径 / 提供项（`provides`）重命名 / 移除已发布内容 / 必须删旧包才能装 |
+| `MINOR` | 向后兼容的**新增** | `PATCH` 归零 | 加角色、加植物、加技能、加装扮、加地图关卡、加新机制；换素材世代 / 结构重做（玩家感知到新东西） |
+| `PATCH` | 向后兼容的**修正** | — | 修 bug、调数值、修动画/贴图、修文案、性能优化、只改文档 |
+| `-PRERELEASE` | 预发布标识，**优先级低于同号正式版** | 发布正式版时整段删掉 | `alpha.1` / `beta.2` / `rc.1`；**渠道变体也用这一段**（如轻量版 `1.11.7-hand`）。点分标识符只许 `[0-9A-Za-z-]`；**纯数字标识符不许前导零**（`-01` 非法） |
+| `+BUILD` | 构建元数据，**不参与比较**（`Compare()` 直接忽略） | 任意 | 历史四段版本的**第 4 段迁到这里**（`1.1.0.1` → `1.1.0+1`）；为 `0` 时**省略**，写成 `1.0.5` 而不是 `1.0.5+0` |
+
+其它硬约束：
+* 数字段**禁前导零**（`01.0.0` 非法）；全 ASCII，不带 `v` 前缀。
+* `PATCH` 不可省：`1.0` ❌ → `1.0.0` ✅；`0.28` ❌ → `0.28.0` ✅。
+
+#### ③ 递增规则（一次改动只抬一次，按「本次改动里最重的那个」定档）
+
+| 这次干了什么 | 动作 | 例 |
+|---|---|---|
+| 只修 bug / 调数值 / 修表现 | `PATCH` +1 | `1.0.5` → **`1.0.6`** |
+| 加功能 / 加角色 / 加机制 / 加可玩内容 | `MINOR` +1，`PATCH` 归零 | `1.0.5` → **`1.1.0`** |
+| 破坏性变更（改 id / key / 删内容） | `MAJOR` +1，其余归零 | `1.1.0` → **`2.0.0`** |
+| 同一版本重打包（只换 zip 内时间戳、无实质改动） | **不抬版本** | `1.0.5` 仍是 `1.0.5` |
+| 预发布转正式 | 删 `-PRERELEASE`，其余不动 | `1.2.0-rc.1` → **`1.2.0`** |
+
+> 一次改动里**只有被动到的 mod 才抬版本**；没动的不要顺手抬。
+> 四段时代的 `+0.0.1.0` / `+0.1.0.0` 口径作废 —— 语义等价映射就是上面的 PATCH / MINOR 两行。
+
+#### ④ 三处同源（改版本必须同时落这三处，缺一处就是自相矛盾）
+
+| # | 位置 | 值 | 备注 |
+|---|---|---|---|
+| 1 | **`mod.json` → `"version"`** | **semver 三段**（唯一直源） | 包内 `CHANGELOG.md` 顶部条目、`.pvzmodeproject` 的 `Version` 都从同一常量取 |
+| 2 | **`.csproj` → `<Version>` / `<AssemblyVersion>` / `<FileVersion>`** | **四段 `MAJOR.MINOR.PATCH.REV`** | .NET 程序集版本**必须四段数字**，与 semver 的映射是 `REV = +BUILD 的数字`（无 build 则 `0`）。例：semver `1.1.0+1` ↔ csproj `1.1.0.1`；semver `1.0.5` ↔ csproj `1.0.5.0` |
+| 3 | **站点 / Release / 夸克 / 官方 issue** | **原样照抄 `mod.json` 的 semver**（含 `-PRERELEASE` / `+BUILD`） | 站点 `mods.js` 的 `version`、`_build_pages.py` 的 `version`、Release 说明表、官方收录 issue 的「当前收录的 Mod 版本」四处一字不差 |
+
+> ⚠️ `AssemblyVersion` 一动 ⇒ DLL 字节变 ⇒ 必须**重编译 + 重新打包 + 重刷产物指纹**（sha256 / 大小 / 站点 `fileSize` / Release 附件）。
+> **只做版本号格式迁移（`1.0.5.0` → `1.0.5`）时不要动 `AssemblyVersion`** —— 四段 `1.0.5.0` 与 semver `1.0.5` 本来就是同一映射，DLL 不必重编、字节不变。
+
+#### ⑤ 迁移映射（历史四段 → semver）
+
+| 旧写法 | 新写法 | 说明 |
+|---|---|---|
+| `1.0.5.0` | `1.0.5` | 第 4 段为 `0` ⇒ 直接丢弃 |
+| `1.11.7.0-hand` | `1.11.7-hand` | 渠道后缀搬进 `PRERELEASE` |
+| `1.1.0.1` | `1.1.0+1` | 第 4 段非 `0` ⇒ 落到 `+BUILD`，信息不丢 |
+| `9.2.0.2` | `9.2.0+2` | 同上 |
+| `1.0` / `0.28` | `1.0.0` / `0.28.0` | 补齐 `PATCH` |
+
+#### ⑥ 校验（机械断言，别靠眼看）
+
+```python
+import re
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+                    r"(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
+                    r"(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$")
+assert SEMVER.match(v), v
+# 预发布里的纯数字标识符禁前导零
+for p in (v.split("-", 1)[1].split("+")[0].split(".") if "-" in v else []):
+    assert not (p.isdigit() and len(p) > 1 and p[0] == "0"), v
+```
+
+**递增工具**：`.cache/_bump_version.py`（`--feature` = MINOR，默认 = PATCH，`--apply` 才写盘、带备份）。
+⚠️ 该脚本按四段相加写成，**改 3 段包前先确认它的 `bump()` 不会写回 4 段**。
+
 ### ★★★ 跨平台（安卓）程序集标识：`.csproj` 必须写 `<AssemblyName>`，`mod.json` 保持 `Runtime/ModAssembly.dll`
 
 > **两个名字是两回事，别混。** 安卓的系统 DLL 加载方式与 PC 不同 ⇒ 程序集**身份（AssemblyName）**
@@ -1741,12 +2021,17 @@ TowerDefenseManager.Instance.AddPacket("<卡key>", ov);     // 内部：GetSeedB
 | 名字 | 写在哪 | 值 | 能改吗 |
 |---|---|---|---|
 | **包内物理路径** | `mod.json` → `runtimeAssembly` | **恰好** `"Runtime/ModAssembly.dll"` | ❌ **一个字都不能改**（硬校验，改 = 整包被拒） |
-| **程序集身份** `AssemblyName` | `.csproj` → `<AssemblyName>` | **本 Mod 的 `<Key>`**（每个 Mod 唯一，如 `SuperGatlingPaper`） | ✅ **必须改成自己的** |
+| **程序集身份** `AssemblyName` | `.csproj` → `<AssemblyName>` | **该 Mod `mod.json` 的 `id`**（小写无分隔，每个 Mod 唯一，如 `supergatlingpaper`） | ✅ **必须改成自己的** |
+
+> ⚠️ **取值一律用 `id`，不要用 `name`**：`id` 是小写无分隔的稳定标识（`supergatlingpaper` / `sunflowerqueenzombie`），
+> 而 `name` 可能是驼峰（`SuperGatlingPaper`）甚至中文（`奶龙僵尸`）。两者都能满足「唯一」，
+> 但工程/文档/脚本对照时**只有 `id` 是唯一对齐的那一列**，统一用它可以少一次人工比对。
 
 ```xml
 <PropertyGroup>
-  <!-- ★ 默认值会给成 ModAssembly（= 包内文件名），安卓上会和别的 Mod 撞车 -->
-  <AssemblyName>SuperGatlingPaper</AssemblyName>
+  <!-- ★ 默认值会给成 ModAssembly（= 包内文件名），安卓上会和别的 Mod 撞车。
+       取值 = 该 Mod 的 mod.json → id（小写、无分隔）。 -->
+  <AssemblyName>supergatlingpaper</AssemblyName>
 </PropertyGroup>
 ```
 
@@ -1778,12 +2063,24 @@ if (!string.IsNullOrWhiteSpace(text) && !text.Equals("Runtime/ModAssembly.dll", 
 
 **构建脚本要跟着改一行**（否则找不到产物；本项目 `build_runtime.py` 现状即为此）：
 ```python
-ASSEMBLY_NAME = "SuperGatlingPaper"        # == csproj 的 <AssemblyName> == 本 Mod <Key>
-# 旧：src = os.path.join(out_dir, "ModAssembly.dll")   ← 会在改名后直接报「编译产物里没有 ModAssembly.dll」
-src = os.path.join(out_dir, ASSEMBLY_NAME + ".dll")     # 构建产物：<AssemblyName>.dll
 TARGET_DLL = os.path.join(MOD_DIR, "Runtime", "ModAssembly.dll")   # 装机名：**不变**
+ASSEMBLY_NAME = "supergatlingpaper"        # == csproj 的 <AssemblyName> == 本 Mod 的 id
+BUILT_DLL = ASSEMBLY_NAME + ".dll"         # dotnet 产物名：<AssemblyName>.dll
+# 旧：src = os.path.join(out_dir, "ModAssembly.dll")   ← 会在改名后直接报「编译产物里没有 ModAssembly.dll」
+src = os.path.join(out_dir, BUILT_DLL)     # 读编译产物
 ```
 即 **`<AssemblyName>.dll`（`dotnet build` 产物）→ 复制并改名为 `ModAssembly.dll`（打进包）**。
+
+**装机前必须加一道程序集身份断言（机械闸门，别只靠文件名）**：
+「文件名是 `<id>.dll`」只能说明**编译脚本**没写错，不能说明**程序集身份**真的改了；
+一旦有人把别的 dll 改名塞进来，就会静默复发。本项目有零依赖解析器 `tools/asmname.py`
+（纯 Python 读 PE → CLI Header → Metadata root → `#~` 表流 → Assembly 表，不依赖 dotnet），
+在 `build_runtime.py` 的 `install()` 里断言：
+```python
+got = read_assembly_identity(src)          # src = 编译产物
+if got["name"] != ASSEMBLY_NAME:
+    raise SystemExit("!! 程序集身份不符：实际 %s，期望 %s" % (got["name"], ASSEMBLY_NAME))
+```
 
 **改名是安全的（为什么不会连带改一堆东西）**：
 * 运行入口按 **`Type.FullName`** 匹配（`XWModCharacterCompanionRuntime.cs:105`）—— **与程序集名无关**；
@@ -1794,15 +2091,39 @@ TARGET_DLL = os.path.join(MOD_DIR, "Runtime", "ModAssembly.dll")   # 装机名�
 
 **自检三条（缺一不可）**：
 1. `grep -o '<AssemblyName>[^<]*</AssemblyName>' runtime_src_*/*.csproj`
-   ⇒ **一个 `ModAssembly` 都不许有**，且**两两不重复**；
+   ⇒ **一个 `ModAssembly` 都不许有**，且每个都该等于**同名那个包 `mod.json` 的 `id`**、**两两不重复**；
 2. 装机后 `Runtime/` 下仍**只有一个** `ModAssembly.dll`（`ValidateDeclaredPackageExecutables`，
    `ModLoader.cs:343-346`）；
-3. 读回程序集身份 == `<Key>`：
-   `AssemblyName.GetAssemblyName("<pmod 解包目录>/Runtime/ModAssembly.dll").Name`。
+   ⚠️ 别把备份 `ModAssembly.dll.bak-*` 留在 `Runtime/` 里 —— 构建脚本结尾的「多余文件」护栏
+   会把它判成违规（本机踩过：奶龙 `build_runtime.py` 因此 rc=1，dll 其实已经写对了）。
+   **备份一律放到包目录上一层**；
+3. 读回程序集身份 == `id`（ModLoader 按 `Type.FullName` 找入口 ⇒ 与程序集名无关，但仍必须唯一）：
+   - 有 .NET SDK：`AssemblyName.GetAssemblyName("<pmod 解包目录>/Runtime/ModAssembly.dll").Name`
+   - 无 dotnet：`python tools/asmname.py <dll>`（零依赖纯 Python 解析器，见上）
+   - 另需**跨 mod 查重**：同一个身份名不许出现在两个不同 mod 上
+     （同一 mod 的 `.pmod` 与解包目录两份副本不算冲突）。
 
-> ⚠️ **本工坊现状（2026-09-28 实测）**：8 个 `runtime_src_*/*.csproj` **全部**写着
-> `<AssemblyName>ModAssembly</AssemblyName>` ⇒ **安卓上会互相顶掉**。补这一条时要连带把
-> csproj 与 `build_runtime.py` 一起改（改完 DLL 字节变 ⇒ **所有产物指纹都要重刷**）。
+> **★ 2026-09-29 已整改**：本工坊 8 个 `runtime_src_*` + 技能仓库 6 个示例工程的
+> `.csproj` 与 `build_runtime.py` 已全部改成 `id`，`tools/asmname.py` 在两边 `tools/` 各放一份。
+> 整改动作 = ①改 `<AssemblyName>`；②加 `ASSEMBLY_NAME`/`BUILT_DLL`；③`install()` 换读法 +
+> 加身份断言；④重编译；⑤把新 dll 换进 `.pmod`（**老包只改 csproj 不重编译等于没修**）。
+> ⚠️ 改完 DLL 字节变 ⇒ 产物指纹 / 站点封面与大小 / Release 附件都要重刷。
+
+**无源码的第三方 `.pmod`：二进制等长改名（次优解）**
+别人给的包（本机没有它的工程）没法重编译，但 `#Strings` 堆里的程序集名就是一个字符串，
+可以**原地等长覆写**：
+```python
+from tools.asmname import find_assembly_name_slot, rewrite_assembly_name
+slot = find_assembly_name_slot(dll)          # → str_off / capacity / independent / prev_byte
+assert slot["independent"]                    # 前一字节必须是 \0；否则是「共享后缀」，不能动
+assert len(new_name) <= slot["capacity"]      # ⚠️ #Strings 是变长堆，改长度会平移后续全部偏移
+rewrite_assembly_name(dll, new_name, write=True)
+```
+* 槽位放不下完整 `id` 时只能取**前缀**：实测凑企鹅僵尸 `id=coupenguinzombie`(16 B) 放不进
+  11 B 的槽位 ⇒ 用 `coupenguin`(10 B)。**唯一性达标即可**，不必等于 `id`。
+* 改完**必须**用独立实现交叉复核：`System.Reflection.Metadata` 的 `PEReader` 遍历
+  TypeDef / MethodDef / FieldDef / AssemblyRef，确认行数与改前**完全一致**（只有 name 变）。
+* 仍需回到 `mod.json` 侧确认 `runtimeEntryType` 在那个 dll 的 TypeDef 表里找得到。
 
 ### 入口实现纪律
 - 三个回调 `Initialize(XWModRuntimeContext)` / `OnAllModsLoaded()` / `Shutdown()`
@@ -1819,8 +2140,9 @@ TARGET_DLL = os.path.join(MOD_DIR, "Runtime", "ModAssembly.dll")   # 装机名�
   `Assets/Textures` 与 `Runtime/` **不在** 72 项里，但放进去不影响加载（只影响编辑器目录骨架）。
 - 编译：`dotnet build -c Release`；**csproj 必须 `<Compile Remove="check_*.cs" />`**，
   否则探针脚本（顶级语句）会被编进库 → CS8805。装机只放 `ModAssembly.dll`，**别带 `.pdb/.deps.json`**。
-  ⚠️ **csproj 还必须写 `<AssemblyName>【本 Mod 的 <Key>】</AssemblyName>`**（安卓要求主程序集名唯一），
-  构建脚本据此取产物 `<AssemblyName>.dll` 再改名为 `ModAssembly.dll` 装机 —— 见上一节「跨平台（安卓）程序集标识」。
+  ⚠️ **csproj 还必须写 `<AssemblyName>【本 Mod 的 id】</AssemblyName>`**（安卓要求主程序集名唯一），
+  构建脚本据此取产物 `<AssemblyName>.dll` 再改名为 `ModAssembly.dll` 装机，并在装机前**断言**
+  程序集身份真的等于该 id（`tools/asmname.py`）—— 见上一节「跨平台（安卓）程序集标识」。
 - ⚠️ **每条出错路径各用一个「已报告」标志，不要共用一个**（如 `_tickFaultReported` /
   `_almanacFaultReported` / `_hookFaultReported` / `_volleyFaultReported`）。
   共用时「先报的那条会把后报的静音掉」：图鉴归类失败（只是难看）会把「大招推进失败」
@@ -1873,6 +2195,287 @@ TARGET_DLL = os.path.join(MOD_DIR, "Runtime", "ModAssembly.dll")   # 装机名�
    把该目录**改名**（如加 `_stale_` 前缀，可逆、别删）即可强制重新解包。
    另外游戏会把包规范化复制成 `mods/<id>-<hash>.pmod` —— 换版本时**这一份也要一起更新**，
    否则可能读的是它而不是你手放的那个包。
+3. **按键边沿检测只能调一次**：`Edge(key)` 这类带 latch 的函数，**同一次按下第二次调用会返回 false**。
+   实测踩过：每帧先跑一个「把 F5~F12 都记一条日志」的函数（它内部用了 `Edge`），
+   紧接着再 `if (Edge(Key.F8)) ToggleCanvas();` ⇒ **动作永远不触发**，
+   日志表现极具误导性 —— 只有"检测到按键 F8"，**没有任何动作日志**。
+   ⇒ 正确写法：**一次遍历 → 一次 `Edge` → 一次 `switch` 分发**。
+4. **热键必须给屏幕可见反馈**：工具/探针类 Mod 建议挂一个**常驻** `CanvasLayer` + `Label`，
+   显示「就绪 + 热键列表」和最近一次动作的状态；
+   ⚠️ **不要与可开关的面板共用同一个 layer**（面板一关提示也没了，用户会再次报"没反应"）——
+   常驻首行本身就是"Mod 活着"的自证，能省掉一整轮来回排查。
+
+### ★★ Godot 导出的 Mono 运行时是 **trimmed** 的：BCL 重载可能整段不存在（2026-09-29 实测）
+
+```
+EXC OnFrame: System.MissingMethodException: Method not found:
+'Void System.IO.File.WriteAllLines(System.String, System.String[], System.Text.Encoding)'.
+   at ProbeRuntime.TickPrewarm()
+```
+
+- **同一个类里"存在的重载"和"不存在的重载"并存**：实测
+  `File.AppendAllText(string, string, Encoding)` **存在**（日志一直写得很好），
+  而 `File.WriteAllLines(string, string[], Encoding)` **不存在** ⇒ **不能假设同族重载都在**。
+- **后果比报错本身严重**：JIT 在**方法入口**就解析引用 ⇒ **整个方法变成废方法**。
+  表现是「某个功能完全没反应」，而且**每帧刷同一条异常**（实测 60 秒刷出 1.2 MB 日志 / 16559 行），
+  真因被自己的重复日志埋掉。
+- **判据（最实用的一条）**：某 BCL API 能不能用，**去看游戏自己的源码有没有用过它** —— 用过的一定被保留。
+- ⇒ **优先用 Godot 引擎 API**：`Godot.FileAccess.Open/StoreLine/GetAsLine`（文本读写）、
+  `Image.SavePng` / `Image.LoadPngFromBuffer`（图片）、`DirAccess`（目录）。
+  BCL 只用最基础的：`string` / `List<>` / `Dictionary` / `Math` / `Path` / `DateTime` / `Encoding`。
+  ⚠️ `Godot.FileAccess` 与 `System.IO.FileAccess` **撞名**，必须写全名 `Godot.FileAccess`。
+- ⇒ **异常处理必须限流**（同类异常只报一次，如记住上一条 `ex.Message`）；
+  否则"每帧异常"会把日志刷到 MB 级，既掩盖真因也拖慢游戏。
+- ⇒ 排查口径：日志里搜 `EXC` / `MissingMethodException`，**只看第一个**，后面全是它的重复。
+
+5. **画布/绘制类 UI 的坐标铁律**：让**位图尺寸 == 视口尺寸**、TextureRect **铺满全屏**（1:1、无缩放），
+   则鼠标坐标**就是**画布坐标 —— 胜过任何比例换算（旧实现：画布固定 640×480 贴左上角、
+   却按"铺满全屏"做缩放换算 ⇒ **笔画与鼠标必然错位**，而且越往右下偏得越多）。
+   配套两点：① 每次打开画布前重新对齐一次（窗口尺寸可能变过）；
+   ② 画布打开时 `MouseFilter = Stop`，否则点击会**穿透到游戏**（在 PvZ 里就是"画着画着种下一棵植物"）。
+   **③ 一次就要想全的最小能力清单**（漏一个用户立刻卡住）：
+   **画 / 填充 / 自由选色 / 橡皮 / 一键清空 / 导出**。
+   * **"清空"最容易被漏** —— 实测踩过：没有清空就没法连着画第二张（新画作叠在旧画作上），
+     样本互相污染、后面所有检索测评全部作废。快捷键建议同时绑 `Delete` 与 `C`；
+     清空时还要**复位鼠标状态**（`_lastMouse`/`_mouseWasDown`），否则下一笔会跟"清空前的最后位置"连出一条线。
+   * **"自由选色"别偷懒成几个固定色块** —— 玩家要的是**连续色相 + 明度**。
+     免脚本类的做法（本项目已实测）：生成两张 `Image`（色相条 H:0→1、明度条 V:0.15→1）贴到 `TextureRect`，
+     **点击时自己做矩形命中判定取色**；⚠️ 命中后必须 `return`，否则这一笔会顺手在画布上留个点；
+     ⚠️ 换色相要**重建明度条**（它的颜色依赖当前色相）。
+   * **"橡皮"= 以画布底色作画**（不必做 alpha 擦除），绑一个 `E` 切换即可；选色时自动退出橡皮更符合直觉。
+   * 提示条要**实时显示当前颜色/模式/段数** —— 否则用户根本不知道自己在用什么工具。
+   * ⚠️ **画布性能**：不要用 `Image.SetPixel` 逐像素画（每次都是 C#↔native 互操作，画一条线几千次调用），
+     也不要每帧 `ImageTexture.Update` 全量上传（1080×600 RGBA 就是 2.6 MB/帧）。
+     正确做法 = **CPU 侧 `byte[]` 当画布真源**（直接写字节）+ **脏标记、最多隔帧 `Image.SetData` + `Update` 一次**。
+
+   **④ 识别类 Mod 的落地顺序（Python 验证 → C# 实装，本项目实测）**：
+   * 先用 **Python** 把算法跑通并测出精度（改一行就能重跑，迭代快）；
+   * ★★★ **图像归一化的第一条铁律：先「合成到底色」再做任何判据**（跨模态匹配必踩）：
+     实测偏差分解（同一张卡面：C# 库特征 vs Python 特征，L2 距离中位）：
+       · 总量 **1.08** —— 而**不同卡面之间的典型距离才 0.8** ⇒ 类别差异被彻底淹没、结果近随机；
+       · 其中「透明底 vs 底色底」占 **0.24**（仅把背景色从纸色换成正黑即可复现）；
+       · 其余 ~0.8 来自**缩放插值实现不同**（`PIL.LANCZOS` ≠ Godot `Interpolation.Lanczos`）。
+     ⇒ **两句口诀：① 归一化先 flatten 到底色；② 特征库由运行侧生成（同源）。**
+     ⚠️ 最隐蔽的一点：**漏 flatten 会表现为「用对方生成的库反而更准」**（因为对方的库恰好是底色底的），
+       极易被误诊成"纯插值问题"而修错方向 —— 本项目就这么绕过一次弯。
+   * ★★ **特征库必须由「运行侧」生成（同源建库），别把 Python 生成的库直接给 C# 用**：
+     实测 —— Python `PIL.LANCZOS` 与 Godot `Image.Interpolation.Lanczos` **内核实现不同**，
+     32×32 采样点就有系统性差异 ⇒ C# 拿 Python 库查询时，10 张真人画作只有 **3~4 张** Top-1 对得上，
+     且伴随"固定几个卡面高频霸榜"的病态现象（是**系统性偏移**，不是噪声）。
+     ⇒ 让 Mod **在游戏内跑一遍卡面渲染 → 用 C# 提特征 → 写库**（本项目 F10 就是这么干的）：
+       库与查询同源，偏差从根上消除，且库与游戏版本严格对应。
+       Python 侧则退居"算法验证 + 精度评测"。
+   * 两侧交换用**同一个二进制格式**（如 `DAGM` 头 + `<H` 长度 + UTF8 key + float32 数组），
+     并让 **C# 侧带一个"批量识别历史样本"的热键**（本项目 F12）—— 对拍不用重新画图；
+   * ⚠️ `Godot.FileAccess.Get32()/Get16()` 返回 **uint**，要显式 `(int)` 转换；
+     `StoreBuffer(byte[])` **只有单参数重载**（`StoreBuffer(buf, 0, len)` 编译不过）；
+   * ⚠️ 自定义数据文件（`.bin` 等）**必然**触发 `entry.unsupported` 警告 —— 无害（Mod 整包解压、按路径直读即可），
+     因为 `provides/overrides` 为空时不会触发"必须声明"的硬约束。
+
+   **⑤ 撤销/重放类功能：一笔必须存"折线"而不是首尾两点**（2026-09-29 实测踩过）：
+   为了"整笔一起回退"把连续线段合并成 `LineOp{A,B}` 只留首尾 ⇒ **撤销重放时曲线会变成直线**。
+   正确做法：一笔 = `StrokeOp{ List<Vector2> Points; Color C; int R; }`，
+   移动时 `Points.Add(pt)`、重放时逐段 `DrawLine(Points[i-1], Points[i])`。
+
+   **⑥ 写日志/文件的创建坑**：`Godot.FileAccess.Open(path, ModeFlags.ReadWrite)`
+   **不会创建不存在的文件**（返回 null，静默什么都不写）——
+   实测后果：日志文件压根没生成，害得用户跑完操作却"无处可看结果"。
+   ⇒ 首次写用 `ModeFlags.Write`（会创建/截断），或首选 `System.IO.File.AppendAllText`（实测在 trimmed 运行时里可用且自动建文件）。
+
+   **⑦ ⚠️ 托管 Mod 里引入「带原生库的重型 NuGet 包」（ONNX Runtime / 深度学习推理）—— 实测受阻，先看结论**：
+   * **托管层跑不起来**：游戏 .NET 运行时是**裁剪过**的，`System.Runtime` 里连
+     `System.Runtime.InteropServices.SafeHandle` 都没有 ⇒ 加载 `Microsoft.ML.OnnxRuntime.dll` 直接
+     `System.TypeLoadException: Could not load type 'System.Runtime.InteropServices.SafeHandle'`。
+     **这不是配置问题、不是版本问题**，是裁剪边界。换包版本、把 dll 放对目录都救不了。
+   * ⛔ **"绕开托管层、直接 P/Invoke 原生 C API"这条路也实测失败 —— 别重复踩**。
+     理论做法（写下来是为了让你知道它长什么样、以及为什么死）：
+     ONNX 的 C API 只有 `OrtGetApiBase` 一个导出符号，其余全在**函数指针表**里 ——
+     `OrtApiBase* { GetApi(version), GetVersionString }`；`OrtApi* api = GetApi(11)`（传低版本最稳，表前缀向后兼容）；
+     `fn(n) = Marshal.GetDelegateForFunctionPointer<T>(Marshal.ReadIntPtr(api, (n-1)*IntPtr.Size))`。
+     索引 = `onnxruntime_c_api.h` 里 `struct OrtApi` 的**字段声明顺序**（用 WebFetch 读头文件数，别凭记忆；数错会直接崩）。
+     本项目用到的（1-based）：`CreateEnv=4`/`CreateSession=8`/`Run=10`/`CreateSessionOptions=11`/
+     `SetSessionGraphOptimizationLevel=24`/`SetIntraOpNumThreads=25`/`SetInterOpNumThreads=26`/
+     `CreateTensorWithDataAsOrtValue=50`/`GetTensorMutableData=52`/`CreateCpuMemoryInfo=70`；
+     `ReleaseXxx` 在表的 85 项之后 ⇒ 不释放（会话内泄漏可接受）；
+     `ORTCHAR_T` 在 Windows 是 `wchar_t` ⇒ 模型路径要 `Marshal.StringToHGlobalUni`。
+     **但读表这一步就死了**（实测日志）：
+     ```
+     MissingMethodException: Method not found:
+       'IntPtr System.Runtime.InteropServices.Marshal.ReadIntPtr(IntPtr, Int32)'
+     ```
+     ⇒ **裁剪运行时把 `Marshal` 裁掉了一大片**（`NativeLibrary.Load` / `SetDllImportResolver` 还在，
+     但 `ReadIntPtr` 没）⇒ **凡是要 `Marshal` 的 Interop 方案都别指望**。
+   * ✅ **真正可行的替代：把模型权重抽出来，在 C# 里手写前向**（本项目已做到，数值完全复刻）。
+     适用条件：模型是**结构规整的小型网络**（ViT / 小 CNN / MLP）—— 本项目的 DINOv2 ViT-S/14
+     （384 维/12 层/6 头/patch 14/21.6M 参数）正属此类。四步：
+     ① Python(`onnx` 包) 读图定位权重：**按「操作数是否为 initializer」来认，别数算子个数**
+        （ViT 注意力内部还有 2 个 `MatMul` 混在同一段里，数个数一定数错），并对每个权重做**形状硬断言**。
+        坑：导出器常把 `weight.T` 固化成 `val_NNN` 命名的初始化器，语义名 `*.weight` 可能**根本不存在**；
+        cls token 之类的小常量也可能被直接固化成 initializer（本项目里它就叫 `expand`, 形状 `[1,1,384]`）。
+     ② Python 里用 numpy 把前向复刻一遍，**与 onnxruntime 对账**
+        （本项目 numpy-fp32 vs ORT-fp16：max|Δ|=3.7e-4、余弦 0.999999 ⇒ 映射与前向都对）。
+     ③ 导出自定义二进制 blob：fp16 存储即可（fp16⊂fp32 **无损**），
+        **matmul 权重预转置成 `[out,in]` 行主序**（C# 内层对 k 连续，缓存友好）。
+     ④ C# 侧纯 `float[]` + `Math` 实现：**不碰 `Marshal` / `BitConverter` / `System.Half`**
+        （fp16→fp32 用「`(1+m/1024)*2^(e-15)` + 幂表」手写，纯算术即**无损**）；
+        把「权重解析」抽成 `IDgByteReader` 接口 ⇒ 本地控制台喂 `FileStream`，
+        **测的就是要装机的那份代码**（本项目 `tools/_vitcs/`：C# vs numpy **cos=1.00000000、max|Δ|=7.4e-7**）。
+     ⚠️ **性能是真坑，必须一开始就设计**（本项目实测，6.1 GMAC 的前向）：
+        · **第一步永远是「标定这台机器」**——写个微基准量出标量与 SIMD 的峰值吞吐，
+          否则你会把「沙箱/虚拟机 CPU 被限速」误判成「我的代码慢」，白优化好几轮。
+          ⚠️ 微基准的**工作集要小**：本项目第一次用大数组测出 0.33 GMAC/s，
+          换成小工作集并**分离 CPU 时间与墙钟**后是 0.78 GMAC/s（有效主频 ≈3.12 GHz）——差 2.4 倍全是测量假象。
+        · RyuJIT **不会**自动向量化浮点归约。实测三条路的吞吐：
+          标量单累加器 **0.78** GMAC/s → 标量 8 路累加器 **1.15**（ILP 只 1.5×，**几乎无用**）
+          → `System.Numerics.Vector<float>`（AVX2，8 宽）**5.73 GMAC/s（7.3×）**。
+          ⇒ **结论：瓶颈是标量峰值利用率，不是依赖链 —— 直接上 SIMD，别在累加器数量上绕。**
+        · SIMD 与多线程都要 **`try/catch` 首次探测 + 失败永久回退**（裁剪运行时里 `Vector<T>` 未必在；
+          检测方式 = 第一次调用时 try 该路径，捕 `TypeLoadException`/`MissingMethodException` 后置标志位；
+          日志里要明确打出「SIMD 生效 / 未生效(原因)」，否则线上永远不知道走的哪条路）。
+        · 本项目最终：单次前向 1.95~2.81 s（**受限沙箱**）⇒ 正常桌面 CPU 预计 0.3~0.6 s。
+          真机数字只能从**游戏内日志**拿（每次识别都打耗时），别拿开发机推算。
+        · 工程坑：`dotnet build` 时若上一轮的 exe 还在跑，产物被锁 ⇒ 构建**静默失败**、你一直在测旧 exe；
+          测速/重测前先 `taskkill //F //IM <exe>.exe`。
+        · ★★ **裁剪运行时会把 `Vector<T>` 的成员裁掉、却留着类型本身**。本项目实测真机报
+          `MissingMethodException: Method not found: 'Void System.Numerics.Vector\`1..ctor(!0[], Int32)'`
+          —— 即「数组+下标」构造器没了（`CopyTo` / `get_Item` / `Zero` 同族，随时一起没）。
+          ⇒ **指针版 SIMD** 可以完全绕开：只保留 `Vector<T>` 这个**类型**与运算符，
+          `fixed` 取裸指针 + `*(Vector<T>*)p` 直接读写；横向求和把向量**写回 `stackalloc` 的缓冲**
+          再标量相加。需要 `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`。
+          本项目实测：指针版 **1781 ms** ＜ 数组构造器版 2437 ms ＜ 标量 9250 ms（对账均 cos=1.00000000）。
+          ⚠️ 同时 `System.Threading.Thread` 的 `ParameterizedThreadStart` 也可能被裁
+          （`TypeLoadException`）⇒ **多线程不能当做 SIMD 的备胎**，探测链要真的逐档试。
+     ⚠️ 顺带：**fp16 权重 + ORT 会让整条图跑 fp16** ⇒ 若 Python 侧用 ORT 建过特征库，
+        换成自己手写的 fp32 前向后**必须用 fp32 重建库**，否则库/查询两侧精度不同源。
+   * ✅ **先试"把候选池收窄"**（本项目实测极有效）：同一套**纯手工**特征，
+     候选池 326 张时 Top-3 严格 20%，**收窄到 20~30 张就升到 55~60%**
+     （因为塔防关卡本来就只出 10~20 张卡）⇒ **常常根本不需要深度模型**。
+     代价：包体从 45 MB 回到 0.5 MB、无原生库、无 VC++ 依赖、还能跨平台。
+   * ✅ **融合权重务必用实测定，且报命中率必须带「严格 / 家族」两个口径的标签**：
+     本项目全池 326 类、10 张真人画作，同一批数据上——
+
+     （早期只有"手工:dino 两路加权"时的数字，作历史参考：纯手工 严格T3 30%、0.5:0.5 50%、0.4:0.6 50% ——
+      它最好的档位也只到 50%，**加上适配器与四路平均后才跳到 90%**。）
+
+     ⇒ ① **不要只报一个数**：曾经因为只报「纯 DINO Top-3 80%」而误判"融合在拖后腿"，
+       实际那个 80% 是**家族**口径，纯 DINO 的**严格**口径只有 40% —— **结论会完全反过来**。
+       ② 权重别照抄上游（上游 0.5/0.5 是给它自己同域场景调的），**必须自己扫一遍**；
+       并注意看曲线是不是**平台**而不是孤峰（只 10 张样本时 1 张 = 10 个百分点，孤峰八成是过拟合）。
+       ③ 剩余错判几乎全是「**同族近亲互混**」（豌豆↔雪豆↔单发豌豆、坚果↔原始坚果、樱桃↔樱桃豌豆）——
+       这类误差不是模型能力问题，而是"涂鸦本来就不足以区分同族变体"，
+       产品上要么接受家族口径，要么在玩法里收窄候选池。
+   * ★★ **跨域检索的最大杠杆：找（或训）一个"域差适配器"，而不是继续堆特征**。
+     本项目最终决定性的一招是上游自带的一个 **1.5 MB 适配器**（`sketch_adapter.onnx`，
+     结构就是 `L2 → LayerNorm → Linear(GELU) → Linear → 残差 → L2`，即 384→512→384 的残差 MLP）。
+     它本来是在**另一个游戏（Slay the Spire 2）的卡图**上练的「速写→卡图」映射，
+     **迁移到本项目照样大幅有效**（严格 Top-3 40% → 60~70%）——
+     说明这类"压掉绘制域差"的适配器**跨素材域可迁移**，值得优先去找/去训，成本远低于重训编码器。
+     ⚠️ 结构这么小 ⇒ 同样可以抽权重 + 纯 C# 手写（本项目 `DgAdapter.cs`，几十行）。
+   * ★★★ **把 Python 预处理算法搬进 C# 时，共享常量必须「逐字节对齐」—— 差 1 就掉一档精度**。
+     本项目真实翻车（2026-09-29）：C# 写 `new Color(0.96f, 0.93f, 0.86f)`，
+     经 `RoundToInt(c*255)` 得 **(245,237,219)**；Python 写 `(0xF4,0xEE,0xDC)` = **(244,238,220)** —— **每通道差 1**。
+     后果有两处，且**叠加**：① 合成底色/补边色差 1；② 若这个颜色**同时充当"有效区"判据的基准**，
+     参考色差 1 会让 `bbox` 再差 1~2 像素 ⇒ 裁剪框偏了 ⇒ 整幅构图微移。
+     实测后果：同一张图两侧嵌入余弦 0.992~0.998，**全池 Top-3 从 90% 掉到 70%**。
+     ⇒ 修法：常量写**能精确还原目标字节的表达式**（`244f/255f`），不要写"看起来像"的小数；
+       并把两侧共享的所有常量（背景色、容差、目标边长、mean/std）都做一次**字节级对账**。
+   * ★★ **怎么快速定位"跨语言一致性"问题：扰动敏感度标定法**（本项目 `tools/dg_sensitivity.py`）。
+     不要瞎猜哪个环节；**对基准图逐项施加已知扰动、量出每项掉多少余弦**，再与"实测总差距"对表：
+     <code>
+       纸色底 ±1            → 掉 1.9e-3 ~ 3.3e-3
+       裁剪框偏 1 像素       → 掉 4.1e-3 ~ 5.0e-3
+       裁剪框偏 2 像素       → 掉 8.2e-3 ~ 8.9e-3
+       换缩放滤波器          → 掉 6e-4 ~ 1.3e-3   ← 最不敏感，别先怀疑它
+       实测总差距            → 2.1e-3 ~ 8.2e-3   ⇒ 与「色差 + 1~2 像素」严丝合缝
+     </code>
+     这套方法的价值：**先用数据把假设空间砍到一两条**，比一轮轮改代码试快得多。
+     配套手段：让探针把**每次查询的中间产物（归一化图、嵌入向量）落盘**，
+     再用离线脚本逐位比 —— 否则"哪里不一致"永远只能猜。
+   * ★ **多路相似度平均**是便宜且稳的融合法：把 {原始库, 适配库} × {原始查询, 适配查询} 四路
+     各自做**候选集内 z-score** 后等权平均，最后再加一小撮手工特征先验（本项目 w=0.20）。
+     全池 326 类 · 10 张真画的最终数字（严格/家族 Top-3）：
+
+     | 配置 | 严格 Top-3 | 家族 Top-3 |
+     |---|---|---|
+     | 纯手工 | 30% | 30% |
+     | 纯 DINO | 40% | 80% |
+     | 融合 0.5:0.5（照抄上游） | 50% | 60% |
+     | 纯 DINO + 适配器（单路） | 60~70% | 90% |
+     | **四路平均 + 0.20×手工** | **90%**（离线）/ **70~80%**（真机） | **100%** |
+
+     ⇒ `wHand ∈ [0, 0.20]` 是**连续平台**（70~90%），所以这一档是稳的、不是调出来的。
+     ⚠️ **手工特征在跨域场景只能当弱先验**（同域训练出来的特征跨域使用会拖后腿，给 0.2 而不是 0.5）。
+     ⚠️⚠️ **10 张样本时 1 张 = 10 个百分点，别靠"换融合配置"去凑分**：本项目实测
+     `avg(S1..S4)+hand` 离线 90%/真机 70%，而 `avg(S3,S4)+hand` 离线 70%/真机 80% —— 两个配置**互相换位**，
+     差异完全是抽样噪声。**样本量不够时，先扩样本，别调参。**
+   * 若确实要带原生库（**本运行时里已证实跑不起来，仅在换运行时/换引擎时参考**）：两个 dll 都放 `Runtime/Dependencies/`
+     （★ **实测该目录确实豁免闸门**，`verify_pmod.py` 对它们零警告；而 `Assets/Models/*.bin|*.onnx`
+     会报 `entry.unsupported`，无害）；原生库要自己挂
+     `NativeLibrary.SetDllImportResolver`（⚠️ 每程序集只能设一次，放在 `Initialize` 最前面）；
+     库项目**不会自动拷 NuGet 的 dll 到产物**（`CopyLocalLockFileAssemblies` 默认 false）⇒
+     打包从 NuGet 缓存取（`runtimes/win-x64/native/onnxruntime.dll`，11 MB）。
+
+#### ★ 多变体包（同一 DLL 打多个包）与**离线产物**的「自述 + 闸门」（2026-09-29 二轮实测）
+
+**背景**：本项目同一个 DLL 打成两个变体 —— `full` 带 42 MB 模型权重（四路融合），
+`hand` **刻意不带**（0.42 MB，识别自动退化为纯手工特征）。两包**同 id**，装机互相覆盖。
+这一轮踩到三个「静默」级问题，都该写进纪律：
+
+1. ★★★ **离线产物必须自述口径，打包期必须断言「不比它的原料旧」**。
+   本项目包内 `cards_features.bin` 是**预处理修好之前**生成的陈旧产物 ⇒ 既不是新口径
+   （实测：与现场同口径重算余弦只有 **0.985**），而运行时查询走新口径 ⇒ 库/查询错配。
+   **代价 20 个百分点**：纯手工档严格 Top-3 30% → 20%；
+   ★ 而且同一份库**还在拖累主路径**（四路融合 90% → 70%）—— 因为手工特征是融合里的一项先验，
+   **次要特征库的溯源问题会静默污染主结果**。
+   ⚠️ 能静默这么久的原因：`DAGM` 头里只有 `magic/ver/dim/count`，**不含任何口径信息**，
+   `LoadLibrary` 只验这四项 ⇒ 陈旧库完全"合法"。
+   ⇒ 做法：① 建库脚本在产物旁写 `<bin>.meta.json`（sha256 / 口径尺寸 / 底色 / 张数 /
+   原料目录 / **原料最新 mtime**）；② 打包脚本读它做**机械断言**（magic/ver/dim、sha 相符、
+   口径 == 运行侧常量、库不早于原料）；③ 闸门函数**刻意不依赖 PIL/numpy**，
+   这样打包脚本可用纯 python 跑（否则等于给打包加依赖）。
+   ⚠️ **别把口径写进数据文件头** —— 那要同时改两侧解析器且有兼容风险；sidecar 零风险且可扩展。
+   ⚠️ 建库脚本的**默认参数**也可能是雷（本项目 `--size` 默认 32，而运行侧要 224）⇒
+   默认值必须等于运行侧的值，不等就 `stderr` 警告。
+
+2. ★★ **多变体包必须能"自述档位"，且日志要把「预期降级」与「异常降级」分开**。
+   旧版把两者说成同一句话（`【纯手工档】⚠ …未加载（异常状态）` / `!! …精度会崩`）⇒
+   刻意打的小包在日志里**永远是"坏了的全量包"**：既无法诊断，也让"降级档"这个立档理由落不了地
+   （你没法确认自己装的是哪一个）。
+   ⇒ 启动时**自动判定变体**：判据用「**包内有没有该变体专属的资源文件**」——
+   这正是打包脚本两个变体的唯一差异，比额外写元数据可靠，也不会衍生"元数据与资源不一致"的新坑。
+   然后 `hand` 档**直接跳过**重型初始化（连"注定失败的 IO"都不做），日志打
+   `**符合预期**（本包按设计不含 X）`；`full` 档缺资源才打 `⚠异常降级`。
+   并把档位并进「每次推理都打的检索模式」字符串（五态：预期 / 异常 / 运行期强制 / 两路 / 四路融合）。
+
+3. ★★ **降级不该靠"换包"**：两包同 id ⇒ 切换要退出游戏换文件重启，应急场景太慢。
+   加一个**运行期开关**（本项目 **F7**：`按包变体自动` ⇄ `强制手工档`，只影响本次会话），
+   外加一个启动时读的开关文件（`user://<mod>/dg_mode.txt` 含 `hand` 即强制）。
+   ⚠️ 强制时**直接跳过重型前向**（真机一次前向 1.8~11 s，跑完再丢弃纯属浪费）；
+   ⚠️ 开关文件用 `Godot.FileAccess` 读，**别用 `File.ReadAllText`**（trimmed 纪律，见上）。
+   好处：探针从此能在**全量包里直接复现**手工档结果、与离线评测对得上 ⇒「回归对照」才真正可用。
+
+4. ★★ **装机脚本要断言「变体身份与包内容一致」**。两包同 id 时装错**不会有任何报错**，
+   只会静默换掉整套识别引擎 ⇒ 装机里加一条 `含权重文件 == (variant == "full")` 的断言。
+
+5. ★★ **每个变体都要有「零重依赖」的独立评测台**。
+   本项目此前唯一权威对照台无条件 `trace()`（要读上游 44 MB 模型）并写死适配器路径 ⇒
+   **纯手工档根本没法独立回归**（而这正是它立档理由之一）。
+   ⇒ 新写一个只依赖 numpy+Pillow 的评测台：基线 / 换库来源（量化跨语言差）/
+   `--verify-lib` 对账断言（现成库 vs 现场同口径重算**逐位一致**）/ 池收窄代理 / 块权重 OFAT 扫描。
+   **评估台自身的依赖越少，越能长期跑下去。**
+   配套：**每道闸门都要配负向对照脚本**（本项目 `tools/_neg_packaging.py`：缺 sidecar / sha 不符 /
+   口径错配 / 头被篡改 / 陈旧库 / 变体交叉错标 ⇒ 11/11 全绿；负向不通过就等于没有闸门）。
+
+6. ★ **「家族口径」不是万灵药，必须分开报**：纯手工档严格与家族**同为 30%**
+   （手工特征认不出同族近亲），而 DINO 档 90% / 100% ⇒ 只有后者能从家族合并获益。
+   ★ **跨域下手工特征的块权重要重配，且方向确定**：上游那组 `0.55/0.55/0.6285` 是
+   "同域卡面↔卡面"调出来的；本项目 OFAT 扫描（一次只动一块）得到**三条单调趋势**——
+   color 越小越好（1.60→10% / 0.6285→30% / ≤0.45→**40%**），edge 与 fine 越大越好
+   （0.55→30% / ≥0.85→**40%**）。三块组合仍是 40%（**不叠加**）⇒ 30% → 40%。
+   n=10 时这是 1 张的量级，**只作方向证据，落地前必须扩样本**。
+   ★ 另：跨语言（PIL LANCZOS ↔ Godot Lanczos）同口径下手工特征余弦最低 **0.9953**、
+   max|Δ| 2.5e-2；但它**不影响** Top-3（用 C# 库与 Python 库跑融合档结果都一样：90%/100%）
+   ⇒ 这类"看起来吓人"的实现差要**先实测它对指标的影响**再决定投不投入。
 
 ### 不开游戏怎么验（本机可行）
 用 `dotnet run --file x.cs` 跑探针，**反射直调游戏程序集里的真函数**（不启动 Godot）：
@@ -2420,6 +3023,101 @@ spawn(BROWSER, ['--headless=new','--disable-gpu','--no-first-run','--no-default-
 - 验收四件套（都要先起服务端）：
   `verify_pmod.py`（离线 22 项）· `.cache/test_api2.py`（接口 133 项）·
   `.cache/verify_ui.js`（真机合成点击 51 项）· `.cache/verify_search_flow.js`（真鼠标 ×10 视口 70 项）
+
+## ★ 「这个包能发给别人吗」——发布前的可移植性审计（2026-09-29 定稿）
+
+主人问"我只把 xxx.pmod 发给别人，对方导入就能用吧？"时的**标准三步核实**，别凭感觉答：
+
+1. **自包含性**：按 `mod.json` 逐条核对——`runtimeAssembly` 指的文件在不在、识别/数据类资源（特征库、权重）齐不齐、
+   角色/卡/精灵是否各自成套。**并且要报"不含什么"**：本项目 `hand` 变体刻意不含 DINO 权重 ⇒ 要明确写出
+   "对方拿到的是降级档（精度 xx%）"，不能只说"能跑"。
+2. **可移植性（扫绝对路径）**：⚠️⚠️ **必须用 UTF-16LE 扫，ASCII 搜等于没查** ——
+   .NET 字符串常量在 PE 里是 UTF-16，`D://` 实际存的是 `44 00 3A 00 5C 00` ⇒ 拿 ASCII `b"D:////"` 去搜
+   **永远 0 命中**，会得出"很干净"的**假结论**。正确姿势：
+   ```python
+   u16 = lambda s: s.encode('utf-16-le')
+   assert u16('Assets/Models/') in dll_bytes       # 相对路径常量应该在
+   for p in ['D:////', 'C:////', 'C:/', '<本机用户名>', 'AppData']:
+       assert u16(p) not in dll_bytes and p.encode() not in dll_bytes
+   ```
+   ⚠️ **别对 PNG/图片做这个扫描** —— 压缩数据里随机出现 `C:/` 这类 3 字节 ASCII 序列是**常态**，
+   会给你一个假阳性（本项目就撞过一次，误以为贴纸图里夹带了路径）。**只扫 `.dll/.json/.tres/.tscn` 这类文本/PE**。
+3. **对外依赖**：① **对方必须是同一游戏版本**（DLL 引用 `GodotSharp`/`PlantsVsZombies`，由对方游戏提供
+   `<Private>false</Private>`，版本不同 ⇒ `TypeLoadException`）；② 装机路径 = 丢进
+   `%APPDATA%\Godot\app_userdata\<游戏名>\mods\`；③ 首次启动会在对方 `user://` 下建日志/缓存目录（无害，但要告知）；
+   ④ `runtimeAssemblyPolicy = optional` ⇒ DLL 加载失败也只是"没有玩法"，不会崩游戏。
+
+★ **一条必须主动说清的取舍**：**包体积 ⇄ 精度**在这种"带模型权重"的 mod 上是**互斥的**
+（本项目 41 MB 里几乎全是 DINO 权重）。想让对方玩得爽就只能发全量包；想省流量发降级包，
+就得如实说"准确率约 30%"。**不要为了"能发出去"而隐瞒降级**。
+
+★ 附带提醒：降级包**不需要**引导对方按任何"生成特征库"的热键 —— 包内特征库已修好口径；
+那些热键在对方机器上只会白等几十秒并写满磁盘。
+
+## ★ 面向手机/触屏玩家：**只靠键盘的功能等于不存在**（2026-09-29 定稿）
+
+Godot 版的 Mod 会同时面向 PC 与安卓 ⇒ **任何"只有热键"的玩家向功能，在手机上就是不可用**。
+本项目踩过的具体例子：给玩家加的"自己重建识别库"只有 `R` / `Shift+R` ⇒ 手机玩家按不了
+（安卓没有物理键盘，而 `Input.IsKeyPressed` 类的热键方案在触屏上完全无从触发）。
+
+### 纪律
+1. **逐个功能过一遍"有没有可点的等价物"**。画布类 Mod 里通常这些都要检查：
+   开关面板 / 提交 / 作废 / 撤销 / 清空 / 橡皮 / 笔粗 / 取色 / 退出子模式 / 以及一切"维护性操作"。
+   本项目的结果：除"重建识别库"外，其余都有按钮等价物 —— **只缺那一个**。
+2. **补按钮时不必为"两种模式"加两个按钮**：让**一个按钮自动选模式**更省位置也更少误触。
+   本项目做法：按钮语义 = 「**有新卡就增量补齐（几秒）；没有新卡就全量重算（约 1 分钟）**」——
+   因为"没有新卡"时增量什么也不做，全量是唯一有意义的动作。
+3. **按钮宽度要按"最小窗口"算**：按钮是逐个累加排版的（不换行）⇒
+   总宽 = Σ宽 + 间隙×(n-1)，拿 `视口 × 画布比例` 的**最小值**去校验，别只按 1080p 估。
+4. 提示行/日志要保留**逐张进度**，否则手机上点一下之后长时间无反馈，会被当成"点坏了"。
+
+## ★ 降级版简介怎么写（不吆喝缺点，但也不撒谎）
+- ❌ 别把降级版写成「完整版简介 + 尾注警告」—— 主次颠倒，玩家读到最后才知道自己拿的是降级包。
+- ✅ **降级版用独立简介**，顺序：一句话定性 → **中性事实**（"识别模型做了精简、整个包约 1.2 MB"）
+  → **"怎么办"**（本项目 = 用贴纸兜底，这是最实用的弥补手段，必须提到显眼处）→ 指向完整版 → 简述玩法。
+- ✅ 不写"准确率低 / 画十次只对三次"这类**缺点吆喝**，但也**绝不写"效果相同"**（那是撒谎）。
+  用中性事实让玩家自己判断；两版差异只体现在"有没有内置完整识别模型"这一句。
+- ★ 顺带答一个玩家最常问的：**"自带识别库吗？装完要自己生成吗？"**
+  本项目答案 = **两版都自带、装好即可识别内置的全部卡，不需要任何额外操作**；
+  「重建识别库」只针对**后来装了别的 mod 植物**的场景 ⇒ 这条必须写进简介，否则玩家会以为要自己配。
+
+## ★ 给 Mod 做「玩家版」：编译期门控 + 构建开关的两个致命坑（2026-09-29 定稿）
+
+需求形态："给一个面向玩家的版本，把开发/调试功能藏掉，只留玩家需要知道的。"
+
+### 设计：用**编译期常量**，不要用运行期标志
+- csproj 加条件组：`<PropertyGroup Condition="'$(PlayerBuild)'=='true'"><DefineConstants>$(DefineConstants);PLAYER_BUILD</DefineConstants></PropertyGroup>`
+  ⚠️ **必须"追加"`$(DefineConstants)`**；直接 `-p:DefineConstants=X` 或只写 X 会**丢掉 SDK 隐式常量**
+  （`NET9_0_OR_GREATER` 等）⇒ 连锁编译错误。统一用 `-p:PlayerBuild=true` 这种**自定义属性名**最安全。
+- 代码里 `#if PLAYER_BUILD` 定义 `private const bool PlayerBuild = true/false;`，用它做条件。
+- ★★ **最省事的隐藏手法：条件构造"热键表数组"**。
+  如果热键派发是 `foreach (var k in HotKeys) { switch (k) ... }`，那么**不把调试键放进数组**，
+  对应的 `case` 分支就**永远不可达** —— 不用逐个 `case` 加 `if`，玩家按下去毫无反应。
+  这比"运行期 if 拦一下"更彻底（`F10` 那种会写几百张文件、跑一分钟的重活，绝不能留在玩家手里）。
+- 提示/README 文案也按同一个常量分流。
+
+### ⚠️ 坑 1：csproj 的 XML 注释里**不能出现两个连续减号**
+写 `<!-- ... build_runtime.py --player ... -->` ⇒ `error MSB4025: An XML comment cannot contain '--'`
+⇒ **整个 csproj 加载失败，任何编译都挂**（dotnet 0.1 秒就退出）。注释里改用「加 player 开关」这类说法。
+
+### ⚠️⚠️ 坑 2（更阴）：**编译失败后打包，会给你一个"看起来成功的假产物"**
+实测链条：csproj 注释非法 ⇒ `build_runtime.py` 秒退 ⇒ **但包目录里的 DLL 还是上一版** ⇒
+照常跑打包脚本 ⇒ 产物名字、大小、闸门全过 ⇒ **只有比对"内 DLL 的 sha"才发现它装的是旧 DLL**
+（本来该是玩家版，结果还是探针版）。
+⇒ **纪律：加了任何构建开关之后，必须断言"新产物内 DLL 的 sha ≠ 原产物"**。
+这一条同时能抓"`#if` 写错名字/常量没生效/构建被跳过"等一整类问题。
+配套自检（都是几行 Python，别靠记性）：
+```python
+# ① 注释块里不能有非法 --（否则 csproj 直接加载不了）
+# ② 注释块里不能出现"无 // 前缀的裸行"（生成器写文件时的转义事故）
+# ③ 玩家版 DLL sha != 探针版 DLL sha
+```
+
+### 交付形态建议
+把"玩家版"做成与"资源档位"**正交**的开关（本项目 = `--variant {full|hand}` × `--player`），
+产物名带后缀（`..._player.pmod` / `..._hand_player.pmod`），并在**装机脚本里同时加进 choices**，
+否则你自己都没法本地测玩家版。`mod.json` 的 `name` 也分流：
+完整版就用干净名字，降级档标"（轻量版）"，**并在简介里如实写清精度代价**。
 
 ## ★ 托管代码 Mod 的交付链必查项：DLL 有没有真的进包（2026-09-26 实测踩坑）
 
@@ -3149,8 +3847,8 @@ fireComponent.timeScale/attackInterval/动画_timeScale/弹数），**任一变�
    - ✅ **正确顺序**：**先 `os.rename` 改名（瞬间完成、不加锁）** → 确认无误 → 再删（或交用户手动删）。
    - 环境限制：`Add-Type`（运行时加载 .NET）被安全策略拦；`taskkill`/`tasklist` 被拦（LOLBin），
      **查/杀进程只能请用户手动**。
-7. **用户机器的"桌面"可能是重定向目录**（本例是 `C:\Users\txgcs\DesktopNew\`，而 `Desktop\` 是空的）
-   ——**找不到"桌面上的文件"时先 `find` 全盘确认**，别只认 `Desktop`。
+7. **用户机器的"桌面"可能是重定向目录**（本机曾实测桌面为 `…\DesktopNew\`，而 `Desktop\` 是空的）
+   ——**找不到"桌面上的文件"时先全盘 `find` 确认**，别只认 `Desktop`。
 8. **★ 移动/改名大目录用系统 `mv`（秒成）**：同盘 `mv` 走 MoveFileEx、瞬间完成；
    实测 python `shutil.move`/`os.rename` 在同一场景**会"挂起"**（疑似目录被扫描/句柄占用），
    换 `mv` 立刻成功。**大目录整理顺序**：用户手动删旧 → `mv` 新目录入位 → `ls` 验证项数。
@@ -3208,6 +3906,106 @@ fireComponent.timeScale/attackInterval/动画_timeScale/弹数），**任一变�
     **替换过程中不会变**，反查即可。
     ⚠️ 反查回来的全局 config **仍要 `Duplicate()` 再传给 `Cover()`**（它会就地改传入对象）。
 
+
+---
+
+# ★★★ V0.30 内容系统（身份体系 / 双登记 / 卡池覆盖）—— 2026-10-12 第 28 轮沉定
+
+> 本节是 **V0.30 起「旧 Mod 在图鉴与选卡里出现重复 / 缺卡」** 的完整口径。落地实现见
+> `ModWorkspace/runtime_shared/ModV30Compat.cs`（共用源，746 行）；四段式坑条目见 `references/pitfalls.md` 的 **D-07 / D-08 / D-09**。
+> 源码真相：`addons/ModEditor/ModSystem/{XWModContentId,XWModRuntimeRegistry,XWModContentCatalog,ModLoader}.cs`。
+
+## 1 身份体系：内容键是三维的，且**一张卡会有两个键**
+
+```csharp
+public sealed record XWModContentId {
+  public string ProviderModId { get; }   // 构造里 ToLowerInvariant()；内置 = ""（IsBuiltIn）
+  public string Category { get; }
+  public string Key { get; }
+  public bool   IsValid => Category.Length>0 && Key.Length>0
+                        && !ProviderModId.Contains('/') && !ProviderModId.Contains('\\')
+                        && !Key.StartsWith("mod/");
+  public string RuntimeKey => IsBuiltIn ? Key : "mod/" + ProviderModId + "/" + Key;   // ★
+}
+```
+
+- 旧式包（`schemaVersion: 2`、**没有 `contentEntries`**）走 `XWModRuntimeRegistry.Register()` 这条 **legacy 路径**。
+- legacy 路径会写**两个键**：
+
+| 写入点 | 键 | 源码 |
+|---|---|---|
+| `RegisterCore()` | `"mod/<id>/<Card>"`（命名空间键） | `XWModRuntimeRegistry.cs:319` |
+| `RefreshAliases()` | `"<Card>"`（裸键 = 兼容别名） | `XWModRuntimeRegistry.cs:395` |
+
+- ★ **命名空间键是 V0.30 的「本意」**（防撞名），**不会消失** ⇒ 修法只能是「**从枚举面移出命名空间键**」。
+- ★ **`RefreshAliases()` 在每次 `RegisterCore()` 结尾都会跑**，并用裸键 `new Registration{…}`
+  —— 该新对象**只拷 9 个字段，不拷 `OverridesBuiltIn`**（⇒ 见 §3）。
+- ★ `XWModContentCatalog.Effective()` 的过滤在 V0.30 多了一项 `(!entry.IsLegacyContent || entry.IsCompatibilityAlias)`
+  —— 也就是说「别名副本」才是被收录给图鉴的那一条。
+
+## 2 谁会被「一张卡两个键」坑到：所有**按字典键枚举**卡表的调用点
+
+`TOWERDEFENSE_PACKETS` 是**一张扁平字典**，而选卡链路**不按卡身份去重**：
+
+| 调用点 | 说明 |
+|---|---|
+| `TowerDefenseManager.CollectPacketConfigsByCost()` `:2468-2490` | `GetPacketConfigCostLower/Upper(+WithTypeList)` 全走它 ⇒ **选卡界面 / 卡库筛选 / 关卡编辑器 / 奖励池** |
+| `Scene/Sandbox/SandboxScreen.cs:87` | 沙盒卡选择器**直接 foreach 整张表** |
+| `addons/ModEditor/…/XWPacketSpawnEntryPacketSelectorWindow.cs:111` | 有 `Distinct(OrdinalIgnoreCase)`，但随后 `GetPacketConfigReadOnly(item)` 可能查不到 `mod/…` 键 |
+| `ResourceManager.GetPacketNames()` `:1267` | `return new List<string>(TOWERDEFENSE_PACKETS.Keys);` |
+| `Almanac.InitZombie()` `:411-431` | 两条来源（共享卡库 `GetCategory("Zombie")` + 无条件 `XWModContentCatalog.GetPackets(plants:false)`）**都不去重** |
+
+## 3 三个已确认的 V0.30 回归 + 修法
+
+| # | 症状 | 根因 | 修法（本机已落地） |
+|---|---|---|---|
+| 1 | **图鉴条目重复** | 老补丁把 `Registrations["Packet"][卡名].OverridesBuiltIn = true` 来让 `Effective("Packet")` 跳过自己；V0.30 的 `RefreshAliases()` **重建该对象 ⇒ 标记归零**，之后任何一次注册（别的 Mod 注册 Feature/商店/钻卡）就**抹掉所有旧 Mod 的标记** | **每 10 帧自愈**：双通道匹配（`kv.Key == 卡名` **或** `kv.Value.ContentId.Key == 卡名`）重新置位，**只补被清零的**；再叠一层**不依赖引擎内部标记**的兜底：反射 `Almanac._zombieLogicalConfigs` 去重（**正向记首命中、倒序 `RemoveAt` 保序**）+ `QueueZombieVirtualRefresh()` |
+| 2 | **选卡重复** | 命名空间键 + 裸键 ⇒ 同一张卡两个键 | 删 `mod/<id>/<Card>`（★ **硬守卫**：裸键必须已在表内才删）+ 对 `TOWERDEFENSE_PACKETBANKS` 每库每分类**保序去重**（每 60 帧）+ `catName == "ModPlants"` 时把**本包卡**摘掉 |
+| 3 | **`overrides.PacketBank` 包「缺卡」** | `overrides.PacketBank` **整体替换**，而 `TowerDefenseManager.GetPacketBankData()` 是**直读**（不做 Include 展开、不合并引擎新增）⇒ 快照停在老版本展开基线就丢卡 | **随引擎基线重出快照** + 兜底合并列表**动态解析**（见 §4） |
+
+★ **`GetRegistrationStack(category, key)` 在 V0.30 语义变了**：查不到裸键时会走 `Aliases` 分支展开，
+返回的是**命名空间 layer**（`IsLegacyContent = true`），**不是**图鉴收录的别名副本
+⇒ 老写法 `foreach (reg in GetRegistrationStack("Packet", 卡名)) reg.OverridesBuiltIn = true;` **完全无效**。
+要拿「图鉴会收录的那条」用 `TryGetEffectiveRegistration(cat, 裸键)`，或遍历 `GetRegistrations()[cat]` 全表双通道匹配。
+
+## 4 覆盖卡池的包（`overrides.PacketBank`）正确流程
+
+1. **离线复刻引擎展开**：`ResourceManager.BuildExpandedPacketBank()` 递归 `Include`
+   —— 注意 `MergePacketBankCategories()` 用的是 `Array.AddRange`，**不去重**，必须逐字复刻。
+   参考实现 `_v30fix/step2_rebank.py`（只重写 `category = { … }` 段，保留 `[gd_resource]` 头与
+   `[ext_resource … type="Script" …]` 行、LF 换行、写盘后**回读断言逐分类逐元素有序相等**、落 `.bak-before-*`）。
+2. **兜底合并要动态**：`GD.Load<Json>("res://Asset/Config/PacketBank/PacketBankResource.json")`
+   → **反向闭包**求「包含目标分类的所有卡池名」（别硬编码 `GeneralZombie/TotalZombie/Total`）；
+   合并时**跳过命名空间键**（`key.IndexOf('/') >= 0`）并按 `saveKey` 去重。
+3. **闸门四件套**（本机 221 条，全绿）：
+   ① 每库每分类内**同名计数 == 1**；
+   ② 快照**精确等于**（含顺序）引擎展开基线 + 自己那一张，且自己那张**恰好 1 次且在末尾**；
+   ③ `Resources/Cards/*.tres` 文件名集合 == `provides.Packet`；
+   ④ 包内 `Resources/**` 与装机 `.pmod` 同名条目**逐字节零漂移**。
+
+## 5 共用兼容层范式（可直接抄）
+
+- 位置 `ModWorkspace/runtime_shared/ModV30Compat.cs`；**用 `<Compile Include=…><Link>ModV30Compat.cs</Link>` 编进各包自己的 dll**
+  —— **不是**共享程序集（铁律：两个 `.pmod` 必须各带自己的 `ModAssembly.dll`）。
+- API：`Install(ownerModId, logTag, cardKeys)` / `Uninstall()` / `HealNow(deep)` / `Cards`。
+- 节拍常量：`HealIntervalFrames = 10`、`BankDedupIntervalFrames = 60`、`InitialScanNodeBudget = 8000`。
+- 抓 `Almanac`：`SceneTree.Connect("node_added", …)` + 一次**显式栈**初扫（别用递归）。
+- 约束：入口里**不定义 Node/Control 子类**；所有公开方法**绝不抛**（`ReportFault` 兜住）；
+  **只碰白名单里的本包卡键**。
+- ★ 有 `<RootNamespace>` 的工程（如 `AlphaSquadMod` / `YetiGargMod`）里必须写 `global::ModV30Compat`。
+
+## 6 V0.30 新增的 Mod 扩展面（后续开发优先用这些，别再用反射）
+
+`XWModExtensions.*`、`XWModContentApi`、`XWModCards` / `CardService`、
+`XWModHooks` / `HookPoints`、`XWModDataService`、`XWModEconomyService`、`XWModBattleSnapshot`、
+`XWModCardPoints`（Mod 卡**费用 hook**）、`TowerDefenseInGamePacketShow` 的「预言(Prophecy)」皮肤；
+`mod.json.settings` + 运行时 `context.Settings.Get<T>`（★ `Get<T>` 读不到**会抛** ⇒ 三态容错）。
+`XWModEnvironmentService` + `FreezeStructure()`：**内容结构一旦冻结就必须重启才能再注册**
+⇒ 「改设置即时生效」做不到，交付说明里要写清"重启生效"。
+⚠️ `TowerDefensePacketConfig` 新增 `requiresPlantTarget / canPlaceOnHypnosedTarget / IsProtectionShield`；
+`Almanac` 的官方两个反例测试文件（`Test/AlmanacVirtualizedResidencyRuntimeTest.cs`、
+`Test/FullGameplayPacketBankValidationRuntimeTest.cs`）在 V0.30 被清空（各剩 1 行），
+但「**不得提前初始化隐藏分类 / 不得提前实例化预览节点**」仍是设计约束。
 ---
 
 ## ★★ 暂停（`SceneTree.Paused`）期间的输入与 GUI —— 时停类 Mod 全程沉淀（2026-09-29 定案）

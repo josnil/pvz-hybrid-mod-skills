@@ -10,6 +10,14 @@
 
 A **WorkBuddy Agent Skills** collection for modding *Plants vs. Zombies Hybrid Edition* (Godot 4 + C#). It consists of three interlocking skills: a universal `.pmod` package-format encyclopedia, plus two end-to-end pipelines — one for plants, one for zombies. Everything here comes from repeated, real-project testing: every "iron rule" corresponds to an actual pitfall, and every pitfall includes its root cause with engine-source-level evidence.
 
+> 🏛 **Upstream baseline (aligned 2026-10-24): [axh-xecoy/pvzhe-mod-template](https://github.com/axh-xecoy/pvzhe-mod-template).**
+> For all three skills, **workflow / manifest contract / identity / versioning / build / install / verification / directory layout** follow the upstream template.
+> **Where content duplicates or conflicts, the template wins**; this repo only keeps tested details the template does not cover.
+> Key deltas: `schemaVersion: 3` (was 2) · **three-part SemVer** · `tools/mod.py` build chain ·
+> evidence from the **published release**, not game source · no host DLLs inside the package.
+> Full text and the conflict/deprecation table:
+> [`skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md`](skills/pvz-hybrid-mod-authoring/references/official-template-baseline.md).
+
 > 🚀 **First time here? Start with [GETTING_STARTED.md](GETTING_STARTED.md)** — get the official SuperGatlingPea template running, then change one stat to make it your first mod (~30–60 min; requires an unpacked game tree, and let your agent finish the path adaptation per `tools/README.md` first).
 
 > 🇨🇳 Chinese documentation: [README.md](README.md)
